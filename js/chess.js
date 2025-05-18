@@ -2,15 +2,42 @@
 const chessboard = document.getElementById("chessboard");
 
 const initialPosition = [
-  ["black_rook", "black_knight", "black_bishop", "black_queen", "black_king", "black_bishop2", "black_knight", "black_rook2"],
+  ["black_rook", "black_knight", "black_bishop", "black_queen", "black_king", "black_bishop2", "black_knight2", "black_rook2"],
   ["black_pawn1", "black_pawn2", "black_pawn3", "black_pawn4", "black_pawn5", "black_pawn6", "black_pawn7", "black_pawn8"],
   ["", "", "", "", "", "", "", ""],
   ["", "", "", "", "", "", "", ""],
   ["", "", "", "", "", "", "", ""],
   ["", "", "", "", "", "", "", ""],
   ["white_pawn1", "white_pawn2", "white_pawn3", "white_pawn4", "white_pawn5", "white_pawn6", "white_pawn7", "white_pawn8"],
-  ["white_rook", "white_knight", "white_bishop", "white_queen", "white_king", "white_bishop", "white_knight", "white_rook"]
+  ["white_rook", "white_knight", "white_bishop", "white_queen", "white_king", "white_bishop", "white_knight2", "white_rook"]
 ];
+
+const preloadImages = (urls) => {
+  urls.forEach(url => {
+    const images = new Image();
+    images.src = url;
+  });
+};
+
+
+function getPartRouter(posision) {
+ const parts = new Set();
+
+ posision.forEach(piece => {
+  const basepath = '/images/${piece}';
+  parts.add('${basepath}.png');
+  parts.add('${basepath}_drag.png');
+ });
+
+ return Array.from(parts);
+}
+
+const parts = getPartRouter(initialPosition);
+preloadImages(parts);
+
+//Lista de imágenes que quieres precargar
+// preloadImages([
+  // "images/black_rook.png",
 
 function createChessboard() {
   for (let row = 0; row < 8; row++) {
@@ -27,6 +54,8 @@ function createChessboard() {
         piece.style.backgroundImage = `url(images/${pieceName}.png)`;
         piece.setAttribute("draggable", true);
         piece.dataset.name = pieceName;
+
+  
 
         piece.addEventListener("dragstart", (e) => {
           piece.style.backgroundImage = `url(images/${pieceName}_drag.png)`;
@@ -63,6 +92,7 @@ function createChessboard() {
     }
   }
 }
+
 
 createChessboard();
 
