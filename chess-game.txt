@@ -1,0 +1,35 @@
+chess-game/
+├── public/
+│   ├── assets/
+│   │   ├── pieces/                  # PNG de piezas (estáticas, arrastre, jaque)
+│   │   └── sounds/
+│   │       ├── intro.mp3
+│   │       ├── drag.mp3
+│   │       ├── capture.mp3
+│   │       ├── check.mp3
+│   │       └── horse.mp3
+│   └── logo.png
+│
+├── src/
+│   ├── main.ts                     # Punto de entrada
+│
+│   ├── logic/
+│   │   ├── engine.ts               # Motor de ajedrez: reglas, jaque, movimientos legales
+│   │   ├── ai.ts                   # Inteligencia artificial (3 niveles)
+│   │   └── fen.ts                  # (Opcional) Convertir tablero a notación FEN
+│
+│   ├── ui/
+│   │   ├── Intro.ts                # Animación del logo y sonido
+│   │   ├── GameModeSelector.ts     # Selección de modo de juego: IA, ID, aleatorio
+│   │   ├── DifficultySelector.ts   # Selección de dificultad si se elige jugar contra IA
+│   │   ├── IdInput.ts              # Formulario de ID si se elige jugar contra jugador por ID
+│   │   ├── Board.ts                # Lógica de tablero y render de piezas
+│   │   ├── Piece.ts                # Componente o clase de pieza y su renderizado
+│   │   ├── Timer.ts                # Control del tiempo por jugador
+│   │   └── AudioManager.ts         # Reproducción de sonidos según evento
+│
+├── index.html
+├── package.json
+├── vite.config.ts
+├── tsconfig.json
+└── README.md
