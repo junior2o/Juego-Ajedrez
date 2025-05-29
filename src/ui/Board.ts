@@ -14,16 +14,71 @@ let timerManager: TimerManager;
 let timeControl: TimeControl = 'classic';
 let isPlayerTurn = true;
 
+function preloadAllPieceImages(): void {
+  const basePieces = ['rook','rook2', 'knight', 'knight2', 'bishop', 'bishop2', 'queen', 'king'];
+  const pawnVariants = Array.from({ length: 8 }, (_, i) => `pawn${i + 1}`);
+  const pieces = [...basePieces, ...pawnVariants];
+  const colors = ['white', 'black'];
+  const suffixes = ['', '_drag', '_check'];
+
+  let preloadContainer = document.getElementById('preload-pieces');
+  if (!preloadContainer) {
+    preloadContainer = document.createElement('div');
+    preloadContainer.id = 'preload-pieces';
+    preloadContainer.style.position = 'absolute';
+    preloadContainer.style.top = '-9999px';
+    preloadContainer.style.left = '-9999px';
+    document.body.appendChild(preloadContainer);
+  }
+
+  for (const color of colors) {
+    for (const piece of pieces) {
+      for (const suffix of suffixes) {
+        if (suffix === '_check' && piece !== 'king') continue;
+
+        const file = `${color}_${piece}${suffix}.png`;
+        // Evita duplicados
+        if (!document.getElementById(file)) {
+          const img = new Image();
+          img.id = file;
+          img.src = `/assets/pieces/${file}`;
+          img.style.width = '1px';
+          img.style.height = '1px';
+          img.onload = () => console.log(`Imagen precargada: ${file}`);
+          img.onerror = () => console.warn(`No se pudo cargar: ${file}`);
+          preloadContainer.appendChild(img);
+        }
+      }
+    }
+  }
+}
+
+preloadAllPieceImages();
+
+
+
 export function showBoard(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
 
+  // Crear el contenedor del tablero si no existe
+  let boardHolder = document.getElementById('board-holder');
+  if (!boardHolder) {
+    boardHolder = document.createElement('div');
+    boardHolder.id = 'board-holder';
+    container.appendChild(boardHolder);
+  }
+
+  // Precargar imágenes
+  preloadAllPieceImages();
+
+  // Inicializar lógica
   engine = new Engine(initialPosition);
+
   timerManager = new TimerManager(timeControl, (loser) => {
     const config = gameConfigManager.getConfig();
     const playerColor = config.playerColor;
     const resultMessage = loser === playerColor ? 'You Lost (Time Out)' : 'You Won (Opponent Timed Out)';
-
     showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
   });
 
@@ -39,6 +94,7 @@ export function showBoard(): void {
     setTimeout(() => triggerAIMove(), 500);
   }
 }
+
 
 function renderBoard(board: Square[][]): void {
   const boardDiv = document.createElement('div');
@@ -87,7 +143,7 @@ function renderBoard(board: Square[][]): void {
 
         img.src = `/assets/pieces/${imageToShow}`;
         img.dataset.defaultSrc = piece.image;
-        img.dataset.dragSrc = piece.dragImage;
+        img.dataset.dragSrc = piece.dragImage || piece.image;
         img.style.width = '100%';
         img.style.height = '100%';
         img.style.objectFit = 'contain';
@@ -122,64 +178,65 @@ function renderBoard(board: Square[][]): void {
       square.addEventListener('dragover', (e) => e.preventDefault());
 
       square.addEventListener('drop', () => {
-  if (!from || !isPlayerTurn) return;
-  const to = { row, col };
+        if (!from || !isPlayerTurn) return;
+        const to = { row, col };
 
-  const targetPiece = engine.getBoard()[to.row][to.col];
-  const isCapture = targetPiece !== null;
+        const targetPiece = engine.getBoard()[to.row][to.col];
+        const isCapture = targetPiece !== null;
 
-  const moved = engine.makeMove(from, to);
-  if (moved) {
-    isPlayerTurn = false;
+        const moved = engine.makeMove(from, to);
+        if (moved) {
+          isPlayerTurn = false;
 
-    if (isCapture) {
-      audioManager.play('capture');
-    }
+          if (isCapture) {
+            audioManager.play('capture');
+          }
 
-    const previousTurn = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
-    timerManager.addIncrement(previousTurn);
-    timerManager.startTurn(engine.getCurrentTurn());
+          const previousTurn = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
+          timerManager.addIncrement(previousTurn);
+          timerManager.startTurn(engine.getCurrentTurn());
 
-    if (engine.isInCheck(engine.getCurrentTurn())) {
-      audioManager.play('check');
-    }
+          if (engine.isInCheck(engine.getCurrentTurn())) {
+            audioManager.play('check');
+          }
 
-    renderBoard(engine.getBoard());
+          renderBoard(engine.getBoard());
 
-    const current = engine.getCurrentTurn();
-    if (!engine.hasAnyLegalMove(current)) {
-      const playerColor = config.playerColor;
-      const playerLost = engine.isInCheck(current) && current === playerColor;
-      const playerWon = engine.isInCheck(current) && current !== playerColor;
-      const isStalemate = !engine.isInCheck(current);
+          const current = engine.getCurrentTurn();
+          if (!engine.hasAnyLegalMove(current)) {
+            const playerColor = config.playerColor;
+            const playerLost = engine.isInCheck(current) && current === playerColor;
+            const playerWon = engine.isInCheck(current) && current !== playerColor;
+            const isStalemate = !engine.isInCheck(current);
 
-      let resultMessage = '';
-      if (playerLost) {
-        resultMessage = '¡Has perdido! (Jaque mate)';
-      } else if (playerWon) {
-        resultMessage = '¡Has ganado! (Jaque mate)';
-      } else if (isStalemate) {
-        resultMessage = 'Tablas (ahogado)';
-      }
+            let resultMessage = '';
+            if (playerLost) {
+              resultMessage = '¡Has perdido! (Jaque mate)';
+            } else if (playerWon) {
+              resultMessage = '¡Has ganado! (Jaque mate)';
+            } else if (isStalemate) {
+              resultMessage = 'Tablas (ahogado)';
+            }
 
-      showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
-      return;
-    }
+            showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
+            return;
+          }
 
-    if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
-      setTimeout(() => triggerAIMove(), 1000);
-    } else {
-      isPlayerTurn = true;
-    }
-  }
+          if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
+            setTimeout(() => triggerAIMove(), 1000);
+          } else {
+            isPlayerTurn = true;
+          }
+        }
 
-  from = null;
-});
+        from = null;
+      });
 
       boardDiv.appendChild(square);
     }
   }
 }
+
 
 function triggerAIMove(): void {
   const config = gameConfigManager.getConfig();
@@ -194,15 +251,15 @@ function triggerAIMove(): void {
     return;
   }
 
-  const moved = playAIMove(engine, config.aiLevel);
-  if (!moved) {
+  const prevBoard = engine.getBoard().map(row => row.map(piece => piece ? { ...piece } : null));
+
+  const move = playAIMove(engine, config.aiLevel);
+  if (!move) {
     const color = engine.getCurrentTurn();
     const playerColor = config.playerColor;
     const playerLost = engine.isInCheck(color) && color === playerColor;
     const playerWon = engine.isInCheck(color) && color !== playerColor;
     const isStalemate = !engine.isInCheck(color);
-
-    
 
     let resultMessage = '';
     if (playerLost) {
@@ -217,12 +274,23 @@ function triggerAIMove(): void {
     return;
   }
 
-  // Calcula el turno anterior (el que acaba de mover la IA)
-  const previousTurn = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
-  timerManager.addIncrement(previousTurn);
-  timerManager.startTurn(engine.getCurrentTurn());
+  const newBoard = engine.getBoard();
+  const capturedPiece = prevBoard[move.to.row][move.to.col];
+  const wasCapture = capturedPiece !== null && capturedPiece.color !== engine.getCurrentTurn();
 
-  if (engine.isInCheck(engine.getCurrentTurn())) {
+  if (wasCapture) {
+    audioManager.play('capture');
+  } else {
+    audioManager.play('move');
+  }
+
+  const currentTurn = engine.getCurrentTurn();
+  const iaColor = currentTurn === 'white' ? 'black' : 'white'; // IA acaba de mover
+
+  timerManager.addIncrement(iaColor);
+  timerManager.startTurn(currentTurn);
+
+  if (engine.isInCheck(currentTurn)) {
     audioManager.play('check');
   }
 

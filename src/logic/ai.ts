@@ -1,19 +1,17 @@
 import { Engine, Position } from './engine';
 import { AIDifficulty } from '../types/AIDifficulty';
 
-export function playAIMove(engine: Engine, level: AIDifficulty): boolean {
+export function playAIMove(engine: Engine, level: AIDifficulty): { from: Position; to: Position } | null {
+  const board = engine.getBoard();
   const aiColor = engine.getCurrentTurn();
   const legalMoves: { from: Position; to: Position; capture: boolean }[] = [];
-
-  const board = engine.getBoard();
 
   for (let row = 0; row < 8; row++) {
     for (let col = 0; col < 8; col++) {
       const piece = board[row][col];
       if (piece && piece.color === aiColor) {
         const from: Position = { row, col };
-        const moves = engine.getLegalMoves(from); // ya están filtrados por jaque
-
+        const moves = engine.getLegalMoves(from);
         for (const to of moves) {
           const target = board[to.row][to.col];
           legalMoves.push({ from, to, capture: !!target });
@@ -22,7 +20,9 @@ export function playAIMove(engine: Engine, level: AIDifficulty): boolean {
     }
   }
 
-  if (legalMoves.length === 0) return false;
+  if (legalMoves.length === 0) {
+    return null; // No legal moves → checkmate or stalemate
+  }
 
   let selectedMove;
 
@@ -45,5 +45,6 @@ export function playAIMove(engine: Engine, level: AIDifficulty): boolean {
     selectedMove = legalMoves[Math.floor(Math.random() * legalMoves.length)];
   }
 
-  return engine.makeMove(selectedMove.from, selectedMove.to);
+  const moved = engine.makeMove(selectedMove.from, selectedMove.to);
+  return moved ? { from: selectedMove.from, to: selectedMove.to } : null;
 }
