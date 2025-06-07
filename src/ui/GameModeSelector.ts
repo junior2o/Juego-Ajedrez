@@ -1,6 +1,7 @@
 // src/ui/GameModeSelector.ts
 
 import { showAILevelSelector } from './AILevelSelector';
+import { showIDConnectScreen } from './IDConnectScreen';
 
 export type GameMode = 'ai' | 'id' | 'random';
 
@@ -34,13 +35,14 @@ export function showGameModeSelector(): void {
     btn.style.width = '260px';
 
     btn.addEventListener('click', () => {
-      if (value === 'ai') {
-        showAILevelSelector(); // ✅ sin parámetros
-      } else {
-        alert('Multiplayer coming soon.');
-      }
-    });
-
+  if (value === 'ai') {
+    showAILevelSelector();
+  } else if (value === 'id') {
+    showIDConnectScreen(); // ✅ Esta es tu pantalla para conexión por ID
+  } else {
+    alert('Random match coming soon.');
+  }
+});
     wrapper.appendChild(btn);
   }
 

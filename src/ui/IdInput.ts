@@ -1,7 +1,5 @@
 // src/ui/IdInput.ts
 
-// src/ui/IdInput.ts
-
 function generatePlayerId(): string {
   const existingId = localStorage.getItem('playerId');
   if (existingId) return existingId;

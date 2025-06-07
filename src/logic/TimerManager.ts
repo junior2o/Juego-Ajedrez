@@ -23,7 +23,7 @@ export class TimerManager {
     this.blackTime = base;
     this.increment = increment;
   }
-
+  
   setUpdateCallback(callback: () => void): void {
     this.updateCallback = callback;
   }
@@ -76,4 +76,17 @@ export class TimerManager {
   getActiveColor(): 'white' | 'black' {
     return this.activeColor;
   }
+
+  reset(): void {
+  this.stop();
+  const { base } = TIME_VALUES[this.control];
+  this.whiteTime = base;
+  this.blackTime = base;
+  this.activeColor = 'white';
 }
+
+}
+
+export const timerManager = new TimerManager('classic', () => {});
+
+

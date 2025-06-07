@@ -94,7 +94,7 @@ export function showBoard(): void {
 }
 
 
-function renderBoard(board: Square[][]): void {
+export function renderBoard(board: Square[][]): void {
   const boardDiv = document.createElement('div');
   boardDiv.id = 'chess-board';
   boardDiv.style.display = 'grid';

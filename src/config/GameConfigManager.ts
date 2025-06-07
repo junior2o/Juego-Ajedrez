@@ -1,6 +1,6 @@
 // src/logic/GameConfigManager.ts
 
-export type GameMode = 'ai' | 'private' | 'random';
+export type GameMode = 'ai' | 'private' | 'random' | 'online';
 export type PlayerColor = 'white' | 'black';
 
 export interface GameConfig {
