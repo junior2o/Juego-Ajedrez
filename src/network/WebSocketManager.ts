@@ -56,7 +56,7 @@ export class WebSocketManager {
       this.socket.send(JSON.stringify(message));
     } else {
       console.warn('[WebSocket] Not ready, message enqueued.');
-      this.messageQueue.push(message); // 🕒 En cola hasta que se abra
+      this.messageQueue.push(message); //  En cola hasta que se abra
     }
   }
 
@@ -65,6 +65,13 @@ export class WebSocketManager {
       this.callbacks[type] = [];
     }
     this.callbacks[type]!.push(callback as any);
+  }
+
+  public off<T extends GameMessage>(type: T['type'], callback: (msg: T) => void): void {
+    const handlers = this.callbacks[type];
+    if (handlers) {
+      this.callbacks[type] = handlers.filter(cb => cb !== callback);
+    }
   }
 
   private dispatchMessage(message: GameMessage): void {

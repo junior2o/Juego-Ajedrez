@@ -6,6 +6,8 @@ import { MatchManager } from '../config/MatchManager';
 import { startRemoteGame } from '../logic/remoteGame';
 import { showGameModeSelector } from './GameModeSelector';
 
+let joinResponseHandler: ((msg: JoinResponseMessage) => void) | null = null;
+
 export function showWaitingForOpponentScreen(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
@@ -32,14 +34,23 @@ export function showWaitingForOpponentScreen(): void {
       type: 'error',
       message: 'Invitación cancelada por el remitente.',
     });
+    // Limpia el listener al cancelar
+    if (joinResponseHandler) {
+      WebSocketManager.getInstance().off?.('join_response', joinResponseHandler);
+      joinResponseHandler = null;
+    }
     showGameModeSelector();
   };
   wrapper.appendChild(cancelButton);
 
   container.appendChild(wrapper);
 
-  // Manejamos la respuesta del oponente
-  WebSocketManager.getInstance().on('join_response', (msg: JoinResponseMessage) => {
+  // Limpia el listener anterior si existe
+  if (joinResponseHandler) {
+    WebSocketManager.getInstance().off?.('join_response', joinResponseHandler);
+  }
+
+  joinResponseHandler = (msg: JoinResponseMessage) => {
     if (msg.accepted) {
       const matchId = `${msg.fromId}-${MatchManager.getInstance().getLocalId()}`;
       MatchManager.getInstance().setMatchId(matchId);
@@ -50,11 +61,21 @@ export function showWaitingForOpponentScreen(): void {
         blackId: msg.fromId,
       };
 
+      // Asigna el color del jugador
+      window.playerColor = 'white';
+
       WebSocketManager.getInstance().send(startMsg);
       startRemoteGame(startMsg);
     } else {
       alert('El oponente ha rechazado la invitación.');
       showGameModeSelector();
     }
-  });
+    // Limpia el listener después de usarlo
+    if (joinResponseHandler) {
+      WebSocketManager.getInstance().off?.('join_response', joinResponseHandler);
+      joinResponseHandler = null;
+    }
+  };
+
+  WebSocketManager.getInstance().on('join_response', joinResponseHandler as any);
 }

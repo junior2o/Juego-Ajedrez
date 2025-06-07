@@ -5,7 +5,11 @@ declare global {
   }
 }
 
-export function showGameOverModal(message: string, onRepeatGame: () => void, onReturnToMenu: () => void): void {
+export function showGameOverModal(
+  message: string,
+  onRepeatGame: () => void,
+  onReturnToMenu: () => void
+): void {
   const container = document.getElementById('app')!;
 
   const overlay = document.createElement('div');
@@ -63,6 +67,11 @@ export function showGameOverModal(message: string, onRepeatGame: () => void, onR
     winnerIcon.style.color = '#222';
     playerMessage = window.playerColor === 'black' ? 'You Won!' : 'You Lost!';
     resultSound = new Audio(window.playerColor === 'black' ? '/assets/sounds/victory.mp3' : '/assets/sounds/defeat.mp3');
+  } else if (message.toLowerCase().includes('desconect')) {
+    winnerIcon.textContent = '❌';
+    winnerIcon.style.color = '#e74c3c';
+    playerMessage = 'Your opponent disconnected.';
+    resultSound = new Audio('/assets/sounds/defeat.mp3');
   } else {
     winnerIcon.textContent = '🤝';
     winnerIcon.style.color = '#888';
@@ -95,6 +104,7 @@ export function showGameOverModal(message: string, onRepeatGame: () => void, onR
   repeatButton.style.border = 'none';
   repeatButton.style.borderRadius = '8px';
   repeatButton.style.transition = 'background-color 0.3s';
+  repeatButton.tabIndex = 0;
   repeatButton.onmouseenter = () => (repeatButton.style.backgroundColor = '#666');
   repeatButton.onmouseleave = () => (repeatButton.style.backgroundColor = '#444');
   repeatButton.onclick = () => {
@@ -112,6 +122,7 @@ export function showGameOverModal(message: string, onRepeatGame: () => void, onR
   menuButton.style.border = 'none';
   menuButton.style.borderRadius = '8px';
   menuButton.style.transition = 'background-color 0.3s';
+  menuButton.tabIndex = 0;
   menuButton.onmouseenter = () => (menuButton.style.backgroundColor = '#444');
   menuButton.onmouseleave = () => (menuButton.style.backgroundColor = '#222');
   menuButton.onclick = () => {
@@ -119,18 +130,22 @@ export function showGameOverModal(message: string, onRepeatGame: () => void, onR
     onReturnToMenu();
   };
 
-  const style = document.createElement('style');
-  style.innerHTML = `
-    @keyframes fadeIn {
-      from { opacity: 0; }
-      to { opacity: 1; }
-    }
-    @keyframes popUp {
-      0% { transform: scale(0.6); opacity: 0; }
-      100% { transform: scale(1); opacity: 1; }
-    }
-  `;
-  document.head.appendChild(style);
+  // Añadir solo si no existe ya el estilo
+  if (!document.getElementById('gameover-modal-style')) {
+    const style = document.createElement('style');
+    style.id = 'gameover-modal-style';
+    style.innerHTML = `
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes popUp {
+        0% { transform: scale(0.6); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
 
   buttonContainer.appendChild(repeatButton);
   buttonContainer.appendChild(menuButton);
@@ -140,4 +155,14 @@ export function showGameOverModal(message: string, onRepeatGame: () => void, onR
   box.appendChild(buttonContainer);
   overlay.appendChild(box);
   container.appendChild(overlay);
+
+  // Permitir cerrar con Escape
+  const escListener = (e: KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      overlay.remove();
+      onReturnToMenu();
+      window.removeEventListener('keydown', escListener);
+    }
+  };
+  window.addEventListener('keydown', escListener);
 }

@@ -4,7 +4,10 @@
     "module": "CommonJS",
     "strict": true,
     "esModuleInterop": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    "rootDir": "src",           // Opcional: asegura que la raíz de entrada es src
+    "forceConsistentCasingInFileNames": true, // Evita errores por mayúsculas/minúsculas
+    "skipLibCheck": true        // Acelera la compilación si no necesitas chequear tipos de dependencias
   },
   "include": ["src/**/*"]
 }

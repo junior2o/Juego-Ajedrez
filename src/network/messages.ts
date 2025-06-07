@@ -4,7 +4,8 @@ export type MessageType =
   | 'join_response'
   | 'move'
   | 'start_game'
-  | 'error';
+  | 'error'
+  | 'opponent_disconnected';
 
 export interface MessageBase {
   type: MessageType;
@@ -40,9 +41,15 @@ export interface ErrorMessage extends MessageBase {
   message: string;
 }
 
+export interface OpponentDisconnectedMessage extends MessageBase {
+  type: 'opponent_disconnected';
+  playerId: string;
+}
+
 export type GameMessage =
   | JoinRequestMessage
   | JoinResponseMessage
   | StartGameMessage
   | MoveMessage
-  | ErrorMessage;
+  | ErrorMessage
+  | OpponentDisconnectedMessage; 

@@ -1,4 +1,4 @@
-// server/server.ts
+// server/src/server.ts
 
 import { WebSocketServer, WebSocket } from 'ws';
 import { v4 as uuidv4 } from 'uuid';
@@ -7,6 +7,7 @@ interface Player {
   id: string;
   socket: WebSocket;
   inGame: boolean;
+  opponentId?: string;
 }
 
 const wss = new WebSocketServer({ port: 3000 });
@@ -51,6 +52,8 @@ wss.on('connection', (socket) => {
             if (playerA && playerB) {
               playerA.inGame = true;
               playerB.inGame = true;
+              playerA.opponentId = playerB.id;
+              playerB.opponentId = playerA.id;
               const white = Math.random() < 0.5 ? playerA.id : playerB.id;
               const black = white === playerA.id ? playerB.id : playerA.id;
 
@@ -70,8 +73,10 @@ wss.on('connection', (socket) => {
           break;
         }
         case 'move': {
-          const opponent = [...players.values()].find(p => p.id !== msg.playerId && p.inGame);
-          if (opponent) sendToPlayer(opponent.id, msg);
+          const player = players.get(msg.playerId);
+          if (player && player.opponentId) {
+            sendToPlayer(player.opponentId, msg);
+          }
           break;
         }
       }
@@ -81,6 +86,20 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('close', () => {
+    const player = players.get(id);
+    if (player && player.opponentId) {
+      // Notifica al oponente que este jugador se ha desconectado
+      sendToPlayer(player.opponentId, {
+        type: 'opponent_disconnected',
+        playerId: id,
+      });
+      // Libera al oponente para que pueda jugar otra partida
+      const opponent = players.get(player.opponentId);
+      if (opponent) {
+        opponent.inGame = false;
+        opponent.opponentId = undefined;
+      }
+    }
     players.delete(id);
     console.log(`[Server] Disconnected: ${id}`);
   });

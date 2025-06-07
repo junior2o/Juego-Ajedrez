@@ -3,6 +3,7 @@ import {
   JoinRequestMessage,
   StartGameMessage,
   JoinResponseMessage,
+  OpponentDisconnectedMessage, 
 } from './messages';
 import { showIncomingInviteScreen } from '../ui/IncomingInviteScreen';
 import { startRemoteGame } from '../logic/remoteGame';
@@ -29,5 +30,10 @@ export function initWebSocketListeners(): void {
       showGameModeSelector();
     }
     // Si fue aceptado, no hacemos nada porque el flujo seguirá con start_game
+  });
+
+  WebSocketManager.getInstance().on('opponent_disconnected', (msg) => {
+    alert('Tu oponente se ha desconectado.');
+    showGameModeSelector();
   });
 }
