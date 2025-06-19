@@ -7,27 +7,60 @@ import { WebSocketManager } from '../network/WebSocketManager';
 import { renderBoard } from '../ui/Board';
 import { showGameOverModal } from '../ui/GameOverModal';
 import { showGameModeSelector} from '../ui/GameModeSelector';
-import { timerManager } from '../logic/TimerManager';
 import { gameConfigManager } from '../config/GameConfigManager';
 import { initialPosition } from './initialPosition';
+import { timerManager, TimerManager, setTimerManager } from '../logic/TimerManager';
 
 let engine: Engine;
 let isMyTurn = false;
+let remoteGameStarted = false;
 
 export function startRemoteGame(startData: StartGameMessage): void {
-  const myId = MatchManager.getInstance().getLocalId();
-  const myColor = startData.whiteId === myId ? 'white' : 'black';
-  const opponentColor = myColor === 'white' ? 'black' : 'white';
+  console.log('[RemoteGame] startRemoteGame ejecutado', startData);
+  if (remoteGameStarted) {
+    console.warn('[RemoteGame] La partida remota ya ha sido iniciada.');
+    return;
+  } 
+  remoteGameStarted = true;
 
+  // Limpia el contenido de #app antes de mostrar el tablero
+  const app = document.getElementById('app');
+  if (app) {
+    app.innerHTML = '';
+    // Vuelve a crear el contenedor del tablero
+    const boardHolder = document.createElement('div');
+    boardHolder.id = 'board-holder';
+    app.appendChild(boardHolder);
+  }
+
+  // Espera a que el ID local esté asignado
+  const myId = MatchManager.getInstance().getLocalId();
+  if (!myId) {
+    console.error('[RemoteGame] ERROR: El ID local no está asignado antes de iniciar la partida.');
+    return;
+  }
+  const myColor = startData.whiteId === myId ? 'white' : 'black';
+
+  // Log de depuración para colores e IDs
+  console.log(`[RemoteGame] Mi ID: ${myId}, White: ${startData.whiteId}, Black: ${startData.blackId}, Mi color: ${myColor}`);
+
+  console.log('[RemoteGame] Inicializando engine');
   engine = new Engine(initialPosition);
   gameConfigManager.setConfig({ mode: 'online', playerColor: myColor });
 
   isMyTurn = myColor === 'white';
+  setTimerManager(new TimerManager('classic', (loser) => {
+    const config = gameConfigManager.getConfig();
+    const playerColor = config.playerColor;
+    const resultMessage = loser === playerColor ? '¡Has perdido por tiempo!' : '¡Has ganado por tiempo!';
+    showGameOverModal(resultMessage, () => showGameModeSelector(), () => showGameModeSelector());
+  }));
 
   timerManager.reset();
   timerManager.startTurn(myColor);
 
-  renderBoard(engine.getBoard());
+  console.log('[Board] renderBoard llamado', engine);
+  renderBoard(engine, engine.getBoard());
 }
 
 export function handleRemoteMove(message: MoveMessage): void {
@@ -36,8 +69,9 @@ export function handleRemoteMove(message: MoveMessage): void {
 
   const success = engine.makeMove(message.from, message.to);
   if (success) {
-    renderBoard(engine.getBoard());
-    timerManager.addIncrement(config.playerColor === 'white' ? 'black' : 'white');
+    renderBoard(engine, engine.getBoard());
+    // El turno ahora es del jugador local
+    timerManager.addIncrement(config.playerColor);
     timerManager.startTurn(config.playerColor);
     isMyTurn = true;
   }
@@ -60,4 +94,8 @@ export function getRemoteEngine(): Engine {
 
 export function canMove(): boolean {
   return isMyTurn;
+}
+
+export function resetRemoteGame(): void {
+  remoteGameStarted = false;
 }

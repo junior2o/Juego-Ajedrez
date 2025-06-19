@@ -5,7 +5,14 @@ export type MessageType =
   | 'move'
   | 'start_game'
   | 'error'
-  | 'opponent_disconnected';
+  | 'opponent_disconnected'
+  | 'init';
+
+export interface InitMessage {
+  type: 'init';
+  id: string;
+}
+
 
 export interface MessageBase {
   type: MessageType;
@@ -21,6 +28,7 @@ export interface JoinResponseMessage extends MessageBase {
   type: 'join_response';
   accepted: boolean;
   fromId: string;
+  toId: string;
 }
 
 export interface StartGameMessage extends MessageBase {
@@ -46,10 +54,23 @@ export interface OpponentDisconnectedMessage extends MessageBase {
   playerId: string;
 }
 
+
 export type GameMessage =
+  | InitMessage
   | JoinRequestMessage
   | JoinResponseMessage
   | StartGameMessage
-  | MoveMessage
   | ErrorMessage
-  | OpponentDisconnectedMessage; 
+  | OpponentDisconnectedMessage
+  | MoveMessage;
+
+export type MessageMap = {
+  join_request: JoinRequestMessage;
+  join_response: JoinResponseMessage;
+  start_game: StartGameMessage;
+  opponent_disconnected: OpponentDisconnectedMessage;
+  init: InitMessage;
+};
+
+
+

@@ -1,4 +1,6 @@
 // src/ui/GameOverModal.ts
+import { resetRemoteGame } from "../logic/remoteGame";
+
 declare global {
   interface Window {
     playerColor: 'white' | 'black';
@@ -109,6 +111,7 @@ export function showGameOverModal(
   repeatButton.onmouseleave = () => (repeatButton.style.backgroundColor = '#444');
   repeatButton.onclick = () => {
     overlay.remove();
+    resetRemoteGame(); // Reinicia el juego remoto al repetir
     onRepeatGame();
   };
 
@@ -127,10 +130,11 @@ export function showGameOverModal(
   menuButton.onmouseleave = () => (menuButton.style.backgroundColor = '#222');
   menuButton.onclick = () => {
     overlay.remove();
+    resetRemoteGame(); // Reinicia el juego remoto al volver al menú
     onReturnToMenu();
   };
 
-  // Añadir solo si no existe ya el estilo
+ 
   if (!document.getElementById('gameover-modal-style')) {
     const style = document.createElement('style');
     style.id = 'gameover-modal-style';
@@ -160,6 +164,7 @@ export function showGameOverModal(
   const escListener = (e: KeyboardEvent) => {
     if (e.key === 'Escape') {
       overlay.remove();
+      resetRemoteGame(); // Reinicia el juego remoto al cerrar el modal
       onReturnToMenu();
       window.removeEventListener('keydown', escListener);
     }

@@ -1,12 +1,13 @@
 // src/config/MatchManager.ts
+
 export class MatchManager {
   private static instance: MatchManager;
-  private localId: string = '';
+  private localId: string = 'esperando'; // Valor por defecto para mostrar en la UI
   private opponentId: string | null = null;
   private matchId: string | null = null;
 
   private constructor() {
-    this.localId = this.generateId();
+    // Ya no generamos un ID local aquí: lo establece el servidor con 'init'
   }
 
   public static getInstance(): MatchManager {
@@ -16,8 +17,14 @@ export class MatchManager {
     return MatchManager.instance;
   }
 
-  private generateId(): string {
-    return Math.random().toString(36).substring(2, 10);
+  public setLocalId(id: string): void {
+    this.localId = id;
+
+    // Actualizamos en tiempo real si ya se mostró la pantalla de conexión
+    const display = document.getElementById('local-id-display');
+    if (display) {
+      display.textContent = `Tu ID: ${id}`;
+    }
   }
 
   public getLocalId(): string {

@@ -2,6 +2,7 @@
 
 import { showAILevelSelector } from './AILevelSelector';
 import { showIDConnectScreen } from './IDConnectScreen';
+import { resetRemoteGame } from '../logic/remoteGame';
 
 export type GameMode = 'ai' | 'id' | 'random';
 
@@ -35,10 +36,11 @@ export function showGameModeSelector(): void {
     btn.style.width = '260px';
 
     btn.addEventListener('click', () => {
+      resetRemoteGame(); // Reinicia el juego remoto antes de cambiar de modo
   if (value === 'ai') {
     showAILevelSelector();
   } else if (value === 'id') {
-    showIDConnectScreen(); // ✅ Esta es tu pantalla para conexión por ID
+    showIDConnectScreen(); //pantalla para conexión por ID
   } else {
     alert('Random match coming soon.');
   }

@@ -2,16 +2,14 @@ import { AudioManager } from './AudioManager';
 import { initialPosition } from '../logic/initialPosition';
 import { Engine, Position, Square } from '../logic/engine';
 import { renderTimers } from './renderTimers';
-import { TimerManager, TimeControl } from '../logic/TimerManager';
+import { timerManager, TimeControl } from '../logic/TimerManager'; // Importa timerManager global
 import { playAIMove } from '../logic/ai';
 import { showGameOverModal } from './GameOverModal';
 import { showGameModeSelector } from './GameModeSelector';
 import { gameConfigManager } from '../config/GameConfigManager';
+import { canMove, sendMove, getRemoteEngine } from '../logic/remoteGame';
 
-let engine: Engine;
 const audioManager = new AudioManager();
-let timerManager: TimerManager;
-let timeControl: TimeControl = 'classic';
 let isPlayerTurn = true;
 
 function preloadAllPieceImages(): void {
@@ -70,31 +68,48 @@ export function showBoard(): void {
   // Precargar imágenes
   preloadAllPieceImages();
 
-  // Inicializar lógica
-  engine = new Engine(initialPosition);
-
-  timerManager = new TimerManager(timeControl, (loser) => {
-    const config = gameConfigManager.getConfig();
-    const playerColor = config.playerColor;
-    const resultMessage = loser === playerColor ? 'You Lost (Time Out)' : 'You Won (Opponent Timed Out)';
-    showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
-  });
-
-  renderTimers(container, timerManager);
-  renderBoard(engine.getBoard());
-
   const config = gameConfigManager.getConfig();
+
+  // Inicializar lógica
+  let engine: Engine;
+  if (config.mode === 'online') {
+    engine = getRemoteEngine(); 
+  } else {
+    engine = new Engine(initialPosition); 
+  }
+
+ 
+  renderTimers(container, timerManager);
+  renderBoard(engine, engine.getBoard());
+
   isPlayerTurn = config.mode !== 'ai' || config.playerColor === 'white';
 
   timerManager.startTurn(engine.getCurrentTurn());
 
   if (config.mode === 'ai' && config.playerColor === 'black') {
-    setTimeout(() => triggerAIMove(), 500);
+    setTimeout(() => triggerAIMove(engine), 500);
   }
 }
 
+export function renderBoard(engine: Engine, board: Square[][]): void {
+  if (!engine) {
+    console.error('Engine is not initialized. Call showBoard() first.');
+    return;
+  }
 
-export function renderBoard(board: Square[][]): void {
+  // Asegura que el contenedor board-holder exista
+  let boardHolder = document.getElementById('board-holder');
+  if (!boardHolder) {
+    const container = document.getElementById('app');
+    if (!container) {
+      console.error('No se encontró el contenedor #app');
+      return;
+    }
+    boardHolder = document.createElement('div');
+    boardHolder.id = 'board-holder';
+    container.appendChild(boardHolder);
+  }
+
   const boardDiv = document.createElement('div');
   boardDiv.id = 'chess-board';
   boardDiv.style.display = 'grid';
@@ -104,7 +119,6 @@ export function renderBoard(board: Square[][]): void {
   boardDiv.style.margin = 'auto';
   boardDiv.style.border = '4px solid black';
 
-  const boardHolder = document.getElementById('board-holder')!;
   boardHolder.innerHTML = '';
   boardHolder.appendChild(boardDiv);
 
@@ -126,7 +140,7 @@ export function renderBoard(board: Square[][]): void {
       const piece = board[row][col];
       if (piece) {
         const img = document.createElement('img');
-        const isKingInCheck =
+        const isKingInCheck: boolean =
           piece.type === 'king' &&
           ((piece.color === 'white' && whiteInCheck) ||
             (piece.color === 'black' && blackInCheck));
@@ -150,6 +164,10 @@ export function renderBoard(board: Square[][]): void {
         square.draggable = true;
 
         square.addEventListener('dragstart', (e) => {
+          if (config.mode === 'online' && !canMove()) {
+            e.preventDefault();
+            return;
+          }
           const piece = engine.getBoard()[row][col];
           if (!isPlayerTurn || !piece || piece.color !== config.playerColor) {
             e.preventDefault();
@@ -162,7 +180,6 @@ export function renderBoard(board: Square[][]): void {
           }, 0);
 
           from = { row, col };
-          
         });
 
         square.addEventListener('dragend', () => {
@@ -177,13 +194,17 @@ export function renderBoard(board: Square[][]): void {
       square.addEventListener('dragover', (e) => e.preventDefault());
 
       square.addEventListener('drop', () => {
+        if (config.mode === 'online' && !canMove()) {
+          audioManager.play('error');
+          return;
+        }
         if (!from || !isPlayerTurn) return;
         const to = { row, col };
 
         const targetPiece = engine.getBoard()[to.row][to.col];
-        const isCapture = targetPiece !== null;
+        const isCapture: boolean = targetPiece !== null;
 
-        const moved = engine.makeMove(from, to);
+        const moved: boolean = engine.makeMove(from, to);
         if (moved) {
           isPlayerTurn = false;
 
@@ -199,16 +220,16 @@ export function renderBoard(board: Square[][]): void {
             audioManager.play('check');
           }
 
-          renderBoard(engine.getBoard());
+          renderBoard(engine, engine.getBoard());
 
           const current = engine.getCurrentTurn();
-          if (!engine.hasAnyLegalMove(current)) {
-            const playerColor = config.playerColor;
-            const playerLost = engine.isInCheck(current) && current === playerColor;
-            const playerWon = engine.isInCheck(current) && current !== playerColor;
-            const isStalemate = !engine.isInCheck(current);
+          const playerColor = config.playerColor;
+          const playerLost: boolean = engine.isInCheck(current) && current === playerColor;
+          const playerWon: boolean = engine.isInCheck(current) && current !== playerColor;
+          const isStalemate: boolean = !engine.isInCheck(current);
 
-            let resultMessage = '';
+          let resultMessage = '';
+          if (!engine.hasAnyLegalMove(current)) {
             if (playerLost) {
               resultMessage = '¡Has perdido! (Jaque mate)';
             } else if (playerWon) {
@@ -221,8 +242,12 @@ export function renderBoard(board: Square[][]): void {
             return;
           }
 
+          if (config.mode === 'online') {
+            sendMove(from, to);
+          }
+
           if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
-            setTimeout(() => triggerAIMove(), 1000);
+            setTimeout(() => triggerAIMove(engine), 1000);
           } else {
             isPlayerTurn = true;
           }
@@ -236,7 +261,7 @@ export function renderBoard(board: Square[][]): void {
   }
 }
 
-function triggerAIMove(): void {
+function triggerAIMove(engine: Engine): void {
   const config = gameConfigManager.getConfig();
 
   if (!config.aiLevel) {
@@ -254,9 +279,9 @@ function triggerAIMove(): void {
   if (!move) {
     const color = engine.getCurrentTurn();
     const playerColor = config.playerColor;
-    const playerLost = engine.isInCheck(color) && color === playerColor;
-    const playerWon = engine.isInCheck(color) && color !== playerColor;
-    const isStalemate = !engine.isInCheck(color);
+    const playerLost: boolean = engine.isInCheck(color) && color === playerColor;
+    const playerWon: boolean = engine.isInCheck(color) && color !== playerColor;
+    const isStalemate: boolean = !engine.isInCheck(color);
 
     let resultMessage = '';
     if (playerLost) {
@@ -315,45 +340,45 @@ function triggerAIMove(): void {
         }, 10);
 
         // Después de la animación, elimina la imagen flotante y muestra la real
-   setTimeout(() => {
-  floatingImg.style.opacity = '0';
-  setTimeout(() => {
-    document.body.removeChild(floatingImg);
-    // Restaura la imagen normal
-    if (img.dataset.defaultSrc) {
-      img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
-    }
-    img.style.visibility = 'visible';
+        setTimeout(() => {
+          floatingImg.style.opacity = '0';
+          setTimeout(() => {
+            document.body.removeChild(floatingImg);
+            // Restaura la imagen normal
+            if (img.dataset.defaultSrc) {
+              img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+            }
+            img.style.visibility = 'visible';
 
-    // Detecta si hay captura ANTES de mover
-    const capturedPiece = prevBoard[move.to.row][move.to.col];
-    const wasCapture = capturedPiece !== null;
+            // Detecta si hay captura ANTES de mover
+            const capturedPiece = prevBoard[move.to.row][move.to.col];
+            const wasCapture: boolean = capturedPiece !== null;
 
-    // Ejecuta el movimiento real
-    engine.makeMove(move.from, move.to);
+            // Ejecuta el movimiento real
+            engine.makeMove(move.from, move.to);
 
-    // Sonido correcto
-    if (wasCapture) {
-      audioManager.play('capture');
-    } else {
-      audioManager.play('move');
-    }
+            // Sonido correcto
+            if (wasCapture) {
+              audioManager.play('capture');
+            } else {
+              audioManager.play('move');
+            }
 
-    const currentTurn = engine.getCurrentTurn();
-    const iaColor = currentTurn === 'white' ? 'black' : 'white';
+            const currentTurn = engine.getCurrentTurn();
+            const iaColor = currentTurn === 'white' ? 'black' : 'white';
 
-    timerManager.addIncrement(iaColor);
-    timerManager.startTurn(currentTurn);
+            timerManager.addIncrement(iaColor);
+            timerManager.startTurn(currentTurn);
 
-    if (engine.isInCheck(currentTurn)) {
-      audioManager.play('check');
-    }
+            if (engine.isInCheck(currentTurn)) {
+              audioManager.play('check');
+            }
 
-    renderBoard(engine.getBoard());
-    isPlayerTurn = true;
+            renderBoard(engine, engine.getBoard());
+            isPlayerTurn = true;
 
-  }, 100);
-}, 410);
+          }, 100);
+        }, 410);
       }, 200); // Espera inicial antes de animar (puedes ajustar)
       return; // Salir para no ejecutar el movimiento dos veces
     }
@@ -364,7 +389,7 @@ function triggerAIMove(): void {
 
   const newBoard = engine.getBoard();
   const capturedPiece = prevBoard[move.to.row][move.to.col];
-  const wasCapture = capturedPiece !== null && capturedPiece.color !== engine.getCurrentTurn();
+  const wasCapture: boolean = capturedPiece !== null && capturedPiece.color !== engine.getCurrentTurn();
 
   if (wasCapture) {
     audioManager.play('capture');
@@ -382,6 +407,7 @@ function triggerAIMove(): void {
     audioManager.play('check');
   }
 
-  renderBoard(engine.getBoard());
+  renderBoard(engine, engine.getBoard());
+  console.log('AI move executed:', move);
   isPlayerTurn = true;
 }

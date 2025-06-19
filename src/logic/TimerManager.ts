@@ -87,6 +87,9 @@ export class TimerManager {
 
 }
 
-export const timerManager = new TimerManager('classic', () => {});
+export let timerManager = new TimerManager('classic', () => {});
+export function setTimerManager(newManager: TimerManager) {
+  timerManager = newManager;
+}
 
 

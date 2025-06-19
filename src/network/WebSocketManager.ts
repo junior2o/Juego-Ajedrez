@@ -1,11 +1,12 @@
-import { GameMessage, MessageType } from './messages';
+import { GameMessage, MessageMap, MessageType } from './messages';
 
-type MessageCallback = (msg: GameMessage) => void;
+type Callback = (msg: GameMessage) => void;
 
 export class WebSocketManager {
   private static instance: WebSocketManager;
   private socket: WebSocket | null = null;
-  private callbacks: Partial<Record<MessageType, MessageCallback[]>> = {};
+
+  private callbacks: { [K in MessageType]?: ((msg: GameMessage) => void)[] } = {};
   private messageQueue: GameMessage[] = [];
   private isConnected = false;
 
@@ -25,7 +26,6 @@ export class WebSocketManager {
       console.log('[WebSocket] Connected');
       this.isConnected = true;
 
-      // Enviar mensajes pendientes
       while (this.messageQueue.length > 0) {
         const msg = this.messageQueue.shift();
         if (msg) this.send(msg);
@@ -56,18 +56,18 @@ export class WebSocketManager {
       this.socket.send(JSON.stringify(message));
     } else {
       console.warn('[WebSocket] Not ready, message enqueued.');
-      this.messageQueue.push(message); //  En cola hasta que se abra
+      this.messageQueue.push(message);
     }
   }
 
-  public on<T extends GameMessage>(type: T['type'], callback: (msg: T) => void): void {
+  public on(type: MessageType, callback: Callback): void {
     if (!this.callbacks[type]) {
       this.callbacks[type] = [];
     }
-    this.callbacks[type]!.push(callback as any);
+    this.callbacks[type]!.push(callback);
   }
 
-  public off<T extends GameMessage>(type: T['type'], callback: (msg: T) => void): void {
+  public off(type: MessageType, callback: Callback): void {
     const handlers = this.callbacks[type];
     if (handlers) {
       this.callbacks[type] = handlers.filter(cb => cb !== callback);
@@ -75,9 +75,14 @@ export class WebSocketManager {
   }
 
   private dispatchMessage(message: GameMessage): void {
-    const handlers = this.callbacks[message.type];
-    if (handlers) {
+    const type = message.type;
+    console.log('[WebSocket] dispatchMessage', type);
+    const handlers = this.callbacks[type];
+    if (handlers && handlers.length > 0) {
       handlers.forEach((cb) => cb(message));
-    }
+    } else if (!(type in this.callbacks)) {
+    // Solo muestra el warning si el tipo es realmente desconocido
+    console.warn('[WebSocket] Invalid message received:', JSON.stringify(message));
   }
+}
 }

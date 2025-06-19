@@ -6,7 +6,7 @@ import { MatchManager } from '../config/MatchManager';
 import { startRemoteGame } from '../logic/remoteGame';
 import { showGameModeSelector } from './GameModeSelector';
 
-let joinResponseHandler: ((msg: JoinResponseMessage) => void) | null = null;
+let joinResponseHandler: ((msg: any) => void) | null = null;
 
 export function showWaitingForOpponentScreen(): void {
   const container = document.getElementById('app')!;
@@ -30,38 +30,39 @@ export function showWaitingForOpponentScreen(): void {
   cancelButton.style.fontSize = '16px';
   cancelButton.style.cursor = 'pointer';
   cancelButton.onclick = () => {
-    WebSocketManager.getInstance().send({
+
+     WebSocketManager.getInstance().send({
       type: 'error',
       message: 'Invitación cancelada por el remitente.',
     });
-    // Limpia el listener al cancelar
+    
     if (joinResponseHandler) {
-      WebSocketManager.getInstance().off?.('join_response', joinResponseHandler);
+      WebSocketManager.getInstance().off('join_response', joinResponseHandler);
       joinResponseHandler = null;
     }
     showGameModeSelector();
   };
   wrapper.appendChild(cancelButton);
-
   container.appendChild(wrapper);
 
   // Limpia el listener anterior si existe
   if (joinResponseHandler) {
-    WebSocketManager.getInstance().off?.('join_response', joinResponseHandler);
+    WebSocketManager.getInstance().off('join_response', joinResponseHandler);
   }
 
-  joinResponseHandler = (msg: JoinResponseMessage) => {
-    if (msg.accepted) {
-      const matchId = `${msg.fromId}-${MatchManager.getInstance().getLocalId()}`;
+  joinResponseHandler = (msg) => {
+    const response = msg as JoinResponseMessage;
+
+    if (response.accepted) {
+      const matchId = `${response.fromId}-${MatchManager.getInstance().getLocalId()}`;
       MatchManager.getInstance().setMatchId(matchId);
 
       const startMsg: StartGameMessage = {
         type: 'start_game',
         whiteId: MatchManager.getInstance().getLocalId(), // quien invitó juega con blancas
-        blackId: msg.fromId,
+        blackId: response.fromId,
       };
 
-      // Asigna el color del jugador
       window.playerColor = 'white';
 
       WebSocketManager.getInstance().send(startMsg);
@@ -70,12 +71,10 @@ export function showWaitingForOpponentScreen(): void {
       alert('El oponente ha rechazado la invitación.');
       showGameModeSelector();
     }
-    // Limpia el listener después de usarlo
-    if (joinResponseHandler) {
-      WebSocketManager.getInstance().off?.('join_response', joinResponseHandler);
-      joinResponseHandler = null;
-    }
+
+    WebSocketManager.getInstance().off('join_response', joinResponseHandler!);
+    joinResponseHandler = null;
   };
 
-  WebSocketManager.getInstance().on('join_response', joinResponseHandler as any);
+  WebSocketManager.getInstance().on('join_response', joinResponseHandler);
 }

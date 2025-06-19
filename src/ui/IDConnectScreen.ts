@@ -6,9 +6,8 @@ import { JoinRequestMessage, StartGameMessage } from '../network/messages';
 import { showWaitingForOpponentScreen } from './WaitingForOpponentScreen';
 import { showIncomingInviteScreen } from './IncomingInviteScreen';
 import { startRemoteGame } from '../logic/remoteGame';
-import { initWebSocketListeners } from 'src/network/initWebSocketListeners';
 
-
+// Mostramos la pantalla de conexión por ID
 export function showIDConnectScreen(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
@@ -25,16 +24,23 @@ export function showIDConnectScreen(): void {
   title.textContent = 'Conectar con otro jugador';
   wrapper.appendChild(title);
 
-  const localId = MatchManager.getInstance().getLocalId();
-
   const localIdDisplay = document.createElement('p');
-  localIdDisplay.textContent = `Tu ID: ${localId}`;
+  localIdDisplay.id = 'local-id-display';
   localIdDisplay.style.fontWeight = 'bold';
+  localIdDisplay.textContent = 'Tu ID: esperando...';
   wrapper.appendChild(localIdDisplay);
+
+  // Mostrar el ID si ya lo tenemos
+  const currentId = MatchManager.getInstance().getLocalId();
+  if (currentId) {
+    localIdDisplay.textContent = `Tu ID: ${currentId}`;
+  }
 
   const input = document.createElement('input');
   input.type = 'text';
   input.placeholder = 'Introduce el ID del oponente';
+  input.id = 'opponent-id';
+  input.name = 'opponent-id';
   input.style.padding = '10px';
   input.style.fontSize = '16px';
   input.style.width = '250px';
@@ -53,6 +59,8 @@ export function showIDConnectScreen(): void {
 
   button.onclick = () => {
     const opponentId = input.value.trim();
+    const localId = MatchManager.getInstance().getLocalId();
+
     if (!opponentId) {
       message.textContent = 'Por favor, introduce un ID válido.';
       return;
@@ -73,13 +81,12 @@ export function showIDConnectScreen(): void {
   container.appendChild(wrapper);
 }
 
-// Escuchar join_request
+// Escuchar mensajes entrantes si aún no se ha hecho
 WebSocketManager.getInstance().on('join_request', (msg) => {
   const joinMsg = msg as JoinRequestMessage;
   showIncomingInviteScreen(joinMsg);
 });
 
-// Escuchar start_game
 WebSocketManager.getInstance().on('start_game', (msg) => {
   const startMsg = msg as StartGameMessage;
   startRemoteGame(startMsg);

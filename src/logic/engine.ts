@@ -184,10 +184,14 @@ export class Engine {
       [[2, 1], [1, 2], [-1, 2], [-2, 1], [-2, -1], [-1, -2], [1, -2], [2, -1]].forEach(([dr, dc]) => add(from.row + dr, from.col + dc));
     }
 
+    const bishopDirs: [number, number][] = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+    const rookDirs: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    const queenDirs: [number, number][] = [...bishopDirs, ...rookDirs];
+
     const directions: [number, number][] = [];
-    if (piece.type === 'bishop') directions.push(...[[-1, -1], [-1, 1], [1, -1], [1, 1]]);
-    if (piece.type === 'rook') directions.push(...[[-1, 0], [1, 0], [0, -1], [0, 1]]);
-    if (piece.type === 'queen') directions.push(...[[-1, -1], [-1, 1], [1, -1], [1, 1], [-1, 0], [1, 0], [0, -1], [0, 1]]);
+    if (piece.type === 'bishop') directions.push(...bishopDirs);
+    if (piece.type === 'rook') directions.push(...rookDirs);
+    if (piece.type === 'queen') directions.push(...queenDirs);
 
     for (const [dr, dc] of directions) {
       let r = from.row + dr, c = from.col + dc;
@@ -272,10 +276,14 @@ export class Engine {
       [[2, 1], [1, 2], [-1, 2], [-2, 1], [-2, -1], [-1, -2], [1, -2], [2, -1]].forEach(([dr, dc]) => add(from.row + dr, from.col + dc));
     }
 
+    const bishopDirs: [number, number][] = [[-1, -1], [-1, 1], [1, -1], [1, 1]];
+    const rookDirs: [number, number][] = [[-1, 0], [1, 0], [0, -1], [0, 1]];
+    const queenDirs: [number, number][] = [...bishopDirs, ...rookDirs];
+
     const directions: [number, number][] = [];
-    if (piece.type === 'bishop') directions.push(...[[-1, -1], [-1, 1], [1, -1], [1, 1]]);
-    if (piece.type === 'rook') directions.push(...[[-1, 0], [1, 0], [0, -1], [0, 1]]);
-    if (piece.type === 'queen') directions.push(...[[-1, -1], [-1, 1], [1, -1], [1, 1], [-1, 0], [1, 0], [0, -1], [0, 1]]);
+    if (piece.type === 'bishop') directions.push(...bishopDirs);
+    if (piece.type === 'rook') directions.push(...rookDirs);
+    if (piece.type === 'queen') directions.push(...queenDirs);
 
     for (const [dr, dc] of directions) {
       let r = from.row + dr, c = from.col + dc;

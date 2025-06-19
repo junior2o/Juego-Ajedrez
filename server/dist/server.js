@@ -9,20 +9,27 @@ console.log('[Server] WebSocket server running on ws://localhost:3000');
 function sendToPlayer(playerId, message) {
     const player = players.get(playerId);
     if (player && player.socket.readyState === ws_1.WebSocket.OPEN) {
+        console.log(`[Server] Enviando mensaje a ${playerId}:`, message);
         player.socket.send(JSON.stringify(message));
+    }
+    else {
+        console.warn(`[Server] No se pudo enviar mensaje a ${playerId}, socket no está listo.`);
     }
 }
 wss.on('connection', (socket) => {
     const id = (0, uuid_1.v4)();
     players.set(id, { id, socket, inGame: false });
     console.log(`[Server] New connection: ${id}`);
+    socket.send(JSON.stringify({ type: 'init', id: id }));
     socket.on('message', (data) => {
         try {
             const msg = JSON.parse(data.toString());
+            console.log('[Server] Mensaje recibido:', msg);
             switch (msg.type) {
                 case 'join_request': {
                     const target = players.get(msg.toId);
                     if (target && !target.inGame) {
+                        console.log(`[Server] Reenviando join_request de ${msg.fromId} a ${msg.toId}`);
                         sendToPlayer(msg.toId, msg); // forward the request
                     }
                     else {
@@ -45,6 +52,7 @@ wss.on('connection', (socket) => {
                             playerB.opponentId = playerA.id;
                             const white = Math.random() < 0.5 ? playerA.id : playerB.id;
                             const black = white === playerA.id ? playerB.id : playerA.id;
+                            console.log(`[Server] Starting game between ${white} (white) and ${black} (black)`);
                             sendToPlayer(white, {
                                 type: 'start_game',
                                 whiteId: white,

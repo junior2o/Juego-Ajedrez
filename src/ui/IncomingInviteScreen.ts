@@ -1,5 +1,4 @@
-// src/ui/IncomingInviteScreen.ts
-import { JoinRequestMessage, JoinResponseMessage, StartGameMessage } from '../network/messages';
+import { JoinRequestMessage, JoinResponseMessage } from '../network/messages';
 import { MatchManager } from '../config/MatchManager';
 import { WebSocketManager } from '../network/WebSocketManager';
 
@@ -39,15 +38,11 @@ export function showIncomingInviteScreen(msg: JoinRequestMessage): void {
       type: 'join_response',
       accepted: true,
       fromId: localId,
+      toId: msg.fromId, // Esencial para que el servidor sepa a quién responder
     };
     WebSocketManager.getInstance().send(response);
 
-    const startGameMessage: StartGameMessage = {
-      type: 'start_game',
-      whiteId: msg.fromId, // quien invitó juega con blancas
-      blackId: localId,
-    };
-    WebSocketManager.getInstance().send(startGameMessage);
+    // No envíes start_game desde el cliente, el servidor lo hará
   };
 
   rejectButton.onclick = () => {
@@ -55,6 +50,7 @@ export function showIncomingInviteScreen(msg: JoinRequestMessage): void {
       type: 'join_response',
       accepted: false,
       fromId: MatchManager.getInstance().getLocalId(),
+      toId: msg.fromId,
     };
     WebSocketManager.getInstance().send(response);
 
