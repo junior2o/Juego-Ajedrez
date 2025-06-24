@@ -1,13 +1,8 @@
-// src/ui/IDConnectScreen.ts
-
 import { MatchManager } from '../config/MatchManager';
 import { WebSocketManager } from '../network/WebSocketManager';
-import { JoinRequestMessage, StartGameMessage } from '../network/messages';
+import { JoinRequestMessage } from '../network/messages';
 import { showWaitingForOpponentScreen } from './WaitingForOpponentScreen';
-import { showIncomingInviteScreen } from './IncomingInviteScreen';
-import { startRemoteGame } from '../logic/remoteGame';
 
-// Mostramos la pantalla de conexión por ID
 export function showIDConnectScreen(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
@@ -30,7 +25,6 @@ export function showIDConnectScreen(): void {
   localIdDisplay.textContent = 'Tu ID: esperando...';
   wrapper.appendChild(localIdDisplay);
 
-  // Mostrar el ID si ya lo tenemos
   const currentId = MatchManager.getInstance().getLocalId();
   if (currentId) {
     localIdDisplay.textContent = `Tu ID: ${currentId}`;
@@ -80,14 +74,3 @@ export function showIDConnectScreen(): void {
 
   container.appendChild(wrapper);
 }
-
-// Escuchar mensajes entrantes si aún no se ha hecho
-WebSocketManager.getInstance().on('join_request', (msg) => {
-  const joinMsg = msg as JoinRequestMessage;
-  showIncomingInviteScreen(joinMsg);
-});
-
-WebSocketManager.getInstance().on('start_game', (msg) => {
-  const startMsg = msg as StartGameMessage;
-  startRemoteGame(startMsg);
-});

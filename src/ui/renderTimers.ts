@@ -1,6 +1,5 @@
-// src/ui/renderTimers.ts
-
 import { TimerManager } from '../logic/TimerManager';
+
 function formatTime(seconds: number): string {
   const min = Math.floor(seconds / 60);
   const sec = seconds % 60;
@@ -8,38 +7,69 @@ function formatTime(seconds: number): string {
 }
 
 export function renderTimers(container: HTMLElement, timer: TimerManager): void {
-  container.innerHTML = '';
-
-  const wrapper = document.createElement('div');
-  wrapper.id = 'timers-wrapper';
-
   const blackTimer = document.createElement('div');
   blackTimer.id = 'black-timer';
-
-  const boardHolder = document.createElement('div');
-  boardHolder.id = 'board-holder';
+  blackTimer.className = 'timer-box';
 
   const whiteTimer = document.createElement('div');
   whiteTimer.id = 'white-timer';
+  whiteTimer.className = 'timer-box';
 
-  wrapper.appendChild(blackTimer); // IA timer on top
-  wrapper.appendChild(boardHolder);
-  wrapper.appendChild(whiteTimer); // Human timer on bottom
+  // Añade estilos solo una vez
+  if (!document.getElementById('timers-style')) {
+    const style = document.createElement('style');
+    style.id = 'timers-style';
+    style.textContent = `
+      .timer-box {
+        position: fixed;
+        right: 10px;
+        width: auto;
+        min-width: 100px;
+        max-width: 160px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-family: monospace;
+        font-size: 1.3rem;
+        padding: 10px 14px;
+        border-radius: 8px;
+        text-align: right;
+        z-index: 1000;
+        pointer-events: none;
+        box-shadow: 0 0 8px rgba(0,0,0,0.4);
+        user-select: none;
+      }
 
-  container.appendChild(wrapper);
+      #black-timer {
+        top: 10px;
+      }
+
+      #white-timer {
+        bottom: 10px;
+      }
+
+      #board-holder {
+        margin-top: 80px;
+        margin-bottom: 80px;
+      }
+
+      @media (max-width: 500px) {
+        .timer-box {
+          font-size: 1rem;
+          padding: 8px 10px;
+          min-width: 80px;
+        }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  // Agrega al DOM principal (fuera del tablero)
+  document.body.appendChild(blackTimer);
+  document.body.appendChild(whiteTimer);
 
   function update() {
-    if (typeof timer.getTime === 'function') {
-      blackTimer.textContent = formatTime(timer.getTime('black'));
-      whiteTimer.textContent = formatTime(timer.getTime('white'));
-
-    }
-
-    if (typeof timer.getActiveColor === 'function') {
-      blackTimer.classList.toggle('active', timer.getActiveColor() === 'black');
-      whiteTimer.classList.toggle('active', timer.getActiveColor() === 'white');
-    }
-
+    blackTimer.textContent = formatTime(timer.getTime('black'));
+    whiteTimer.textContent = formatTime(timer.getTime('white'));
     requestAnimationFrame(update);
   }
 

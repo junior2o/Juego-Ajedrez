@@ -36,3 +36,22 @@
 #black-timer.active {
   box-shadow: 0 0 10px 2px #00c8ff;
 }
+
+
+#black-timer.active,
+#white-timer.active {
+  font-weight: bold;
+  color: #28a745;
+}
+
+.waiting-blink {
+  animation: blink 1s step-start infinite;
+  color: #999;
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0.3;
+  }
+}
+

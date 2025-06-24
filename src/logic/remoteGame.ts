@@ -10,6 +10,7 @@ import { showGameModeSelector} from '../ui/GameModeSelector';
 import { gameConfigManager } from '../config/GameConfigManager';
 import { initialPosition } from './initialPosition';
 import { timerManager, TimerManager, setTimerManager } from '../logic/TimerManager';
+import { renderTimers } from '../ui/renderTimers';
 
 let engine: Engine;
 let isMyTurn = false;
@@ -25,11 +26,11 @@ export function startRemoteGame(startData: StartGameMessage): void {
 
   // Limpia el contenido de #app antes de mostrar el tablero
   const app = document.getElementById('app');
+  const boardHolder = document.createElement('div');
+  boardHolder.id = 'board-holder';
   if (app) {
     app.innerHTML = '';
     // Vuelve a crear el contenedor del tablero
-    const boardHolder = document.createElement('div');
-    boardHolder.id = 'board-holder';
     app.appendChild(boardHolder);
   }
 
@@ -57,7 +58,11 @@ export function startRemoteGame(startData: StartGameMessage): void {
   }));
 
   timerManager.reset();
-  timerManager.startTurn(myColor);
+  if (isMyTurn) {
+    timerManager.startTurn(myColor);
+}
+
+  renderTimers(boardHolder, timerManager);
 
   console.log('[Board] renderBoard llamado', engine);
   renderBoard(engine, engine.getBoard());

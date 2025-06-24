@@ -1,9 +1,8 @@
 // src/ui/WaitingForOpponentScreen.ts
 
 import { WebSocketManager } from '../network/WebSocketManager';
-import { JoinResponseMessage, StartGameMessage } from '../network/messages';
+import { JoinResponseMessage } from '../network/messages';
 import { MatchManager } from '../config/MatchManager';
-import { startRemoteGame } from '../logic/remoteGame';
 import { showGameModeSelector } from './GameModeSelector';
 
 let joinResponseHandler: ((msg: any) => void) | null = null;
@@ -30,12 +29,11 @@ export function showWaitingForOpponentScreen(): void {
   cancelButton.style.fontSize = '16px';
   cancelButton.style.cursor = 'pointer';
   cancelButton.onclick = () => {
-
-     WebSocketManager.getInstance().send({
+    WebSocketManager.getInstance().send({
       type: 'error',
       message: 'Invitación cancelada por el remitente.',
     });
-    
+
     if (joinResponseHandler) {
       WebSocketManager.getInstance().off('join_response', joinResponseHandler);
       joinResponseHandler = null;
@@ -57,16 +55,8 @@ export function showWaitingForOpponentScreen(): void {
       const matchId = `${response.fromId}-${MatchManager.getInstance().getLocalId()}`;
       MatchManager.getInstance().setMatchId(matchId);
 
-      const startMsg: StartGameMessage = {
-        type: 'start_game',
-        whiteId: MatchManager.getInstance().getLocalId(), // quien invitó juega con blancas
-        blackId: response.fromId,
-      };
-
-      window.playerColor = 'white';
-
-      WebSocketManager.getInstance().send(startMsg);
-      startRemoteGame(startMsg);
+      console.log('[WaitingScreen] Invitación aceptada. Esperando inicio de partida desde el servidor.');
+      
     } else {
       alert('El oponente ha rechazado la invitación.');
       showGameModeSelector();
