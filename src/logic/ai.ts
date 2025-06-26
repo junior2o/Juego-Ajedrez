@@ -1,16 +1,37 @@
+// src/logic/ai.ts
+
 import { Engine, Position } from './engine';
 import { AIDifficulty } from '../types/AIDifficulty';
 
-// Evaluación mejorada: material + movilidad + factor aleatorio
+const openingBook: Record<string, { from: Position; to: Position }[][]> = {
+  white: [
+    [
+      { from: { row: 6, col: 4 }, to: { row: 4, col: 4 } }, // e4
+      { from: { row: 7, col: 6 }, to: { row: 5, col: 5 } }, // Nf3
+    ],
+    [
+      { from: { row: 6, col: 3 }, to: { row: 4, col: 3 } }, // d4
+      { from: { row: 7, col: 1 }, to: { row: 5, col: 2 } }, // Nc3
+    ]
+  ],
+  black: [
+    [
+      { from: { row: 1, col: 4 }, to: { row: 3, col: 4 } }, // e5
+      { from: { row: 0, col: 6 }, to: { row: 2, col: 5 } }, // Nf6
+    ],
+    [
+      { from: { row: 1, col: 3 }, to: { row: 3, col: 3 } }, // d5
+      { from: { row: 0, col: 1 }, to: { row: 2, col: 2 } }, // Nc6
+    ]
+  ]
+};
+
 function evaluateBoard(board: any[][], aiColor: string, engine?: Engine): number {
-   if (engine) {
+  if (engine) {
     const current = engine.getCurrentTurn();
-    // Si el rival no tiene movimientos y está en jaque: mate a favor
     if (!engine.hasAnyLegalMove(current) && engine.isInCheck(current)) {
-      // Si el turno es del rival, mate a favor de la IA
       return current !== aiColor ? 10000 : -10000;
     }
-    // Si el rival no tiene movimientos y NO está en jaque: tablas
     if (!engine.hasAnyLegalMove(current) && !engine.isInCheck(current)) {
       return 0;
     }
@@ -19,30 +40,40 @@ function evaluateBoard(board: any[][], aiColor: string, engine?: Engine): number
     pawn: 1, knight: 3, bishop: 3, rook: 5, queen: 9, king: 100
   };
   let score = 0;
-  for (const row of board) {
-    for (const piece of row) {
+  let pieceCount = 0;
+  let enemyKingPos: Position | null = null;
+  for (let row = 0; row < 8; row++) {
+    for (let col = 0; col < 8; col++) {
+      const piece = board[row][col];
       if (piece) {
         const value = pieceValues[piece.type];
         score += piece.color === aiColor ? value : -value;
+        pieceCount++;
+        if (piece.type === 'king' && piece.color !== aiColor) {
+          enemyKingPos = { row, col };
+        }
       }
     }
   }
-  // Movilidad (si tienes acceso al engine)
   if (engine) {
     const myMoves = getAllLegalMoves(engine).length;
-    // Cambia el turno para contar los del rival
     const originalTurn = engine.getCurrentTurn();
     (engine as any).currentTurn = originalTurn === 'white' ? 'black' : 'white';
     const oppMoves = getAllLegalMoves(engine).length;
-    (engine as any).currentTurn = originalTurn; // restaurar turno
+    (engine as any).currentTurn = originalTurn;
     score += 0.1 * (myMoves - oppMoves);
   }
-  // Pequeño factor aleatorio para evitar ciclos exactos
+  if (pieceCount <= 5 && enemyKingPos) {
+    const corners = [
+      { row: 0, col: 0 }, { row: 0, col: 7 }, { row: 7, col: 0 }, { row: 7, col: 7 }
+    ];
+    const minDist = Math.min(...corners.map(c => Math.abs(c.row - enemyKingPos!.row) + Math.abs(c.col - enemyKingPos!.col)));
+    score += (14 - minDist) * 0.5;
+  }
   score += Math.random() * 0.01;
   return score;
 }
 
-// Obtiene todos los movimientos legales para el turno actual
 function getAllLegalMoves(engine: Engine): { from: Position; to: Position }[] {
   const board = engine.getBoard();
   const color = engine.getCurrentTurn();
@@ -61,7 +92,6 @@ function getAllLegalMoves(engine: Engine): { from: Position; to: Position }[] {
   return moves;
 }
 
-// Minimax puro
 function minimax(engine: Engine, depth: number, maximizing: boolean, aiColor: string): number {
   if (depth === 0 || getAllLegalMoves(engine).length === 0) {
     return evaluateBoard(engine.getBoard(), aiColor, engine);
@@ -73,7 +103,7 @@ function minimax(engine: Engine, depth: number, maximizing: boolean, aiColor: st
       const cloned = engine.clone();
       cloned.makeMove(move.from, move.to);
       const evalScore = minimax(cloned, depth - 1, false, aiColor);
-      if (evalScore > maxEval) maxEval = evalScore;
+      maxEval = Math.max(maxEval, evalScore);
     }
     return maxEval;
   } else {
@@ -82,13 +112,12 @@ function minimax(engine: Engine, depth: number, maximizing: boolean, aiColor: st
       const cloned = engine.clone();
       cloned.makeMove(move.from, move.to);
       const evalScore = minimax(cloned, depth - 1, true, aiColor);
-      if (evalScore < minEval) minEval = evalScore;
+      minEval = Math.min(minEval, evalScore);
     }
     return minEval;
   }
 }
 
-// Minimax con poda alfa-beta
 function alphabeta(engine: Engine, depth: number, alpha: number, beta: number, maximizing: boolean, aiColor: string): number {
   if (depth === 0 || getAllLegalMoves(engine).length === 0) {
     return evaluateBoard(engine.getBoard(), aiColor, engine);
@@ -117,7 +146,7 @@ function alphabeta(engine: Engine, depth: number, alpha: number, beta: number, m
   }
 }
 
-export function playAIMove(engine: Engine, level: AIDifficulty): { from: Position; to: Position } | null {
+export function playAIMove(engine: Engine, level: AIDifficulty): { from: Position; to: Position; capture: boolean; checkmate?: boolean } | null {
   const board = engine.getBoard();
   const aiColor = engine.getCurrentTurn();
   const legalMoves: { from: Position; to: Position; capture: boolean }[] = [];
@@ -127,8 +156,7 @@ export function playAIMove(engine: Engine, level: AIDifficulty): { from: Positio
       const piece = board[row][col];
       if (piece && piece.color === aiColor) {
         const from: Position = { row, col };
-        const moves = engine.getLegalMoves(from);
-        for (const to of moves) {
+        for (const to of engine.getLegalMoves(from)) {
           const target = board[to.row][to.col];
           legalMoves.push({ from, to, capture: !!target });
         }
@@ -136,8 +164,37 @@ export function playAIMove(engine: Engine, level: AIDifficulty): { from: Positio
     }
   }
 
-  if (legalMoves.length === 0) {
-    return null; // No legal moves → checkmate or stalemate
+  if (legalMoves.length === 0) return null;
+
+  const turnNumber = (engine as any).getMoveHistory?.().length ?? 0;
+  if (level !== 'easy' && turnNumber < 4) {
+    const possibleOpenings = openingBook[aiColor];
+    const opening = possibleOpenings[Math.floor(Math.random() * possibleOpenings.length)];
+    const move = opening[turnNumber / 2];
+    if (move && engine.getLegalMoves(move.from).some(m => m.row === move.to.row && m.col === move.to.col)) {
+      const moved = engine.makeMove(move.from, move.to);
+      const target = board[move.to.row][move.to.col];
+      return moved ? {
+        from: move.from,
+        to: move.to,
+        capture: !!target
+      } : null;
+    }
+  }
+
+  for (const move of legalMoves) {
+    const cloned = engine.clone();
+    cloned.makeMove(move.from, move.to);
+    const enemyTurn = cloned.getCurrentTurn();
+    if (!cloned.hasAnyLegalMove(enemyTurn) && cloned.isInCheck(enemyTurn)) {
+      const moved = engine.makeMove(move.from, move.to);
+      return moved ? {
+        from: move.from,
+        to: move.to,
+        capture: move.capture,
+        checkmate: true
+      } : null;
+    }
   }
 
   let bestMoves: typeof legalMoves = [];
@@ -145,42 +202,33 @@ export function playAIMove(engine: Engine, level: AIDifficulty): { from: Positio
 
   if (level === 'easy') {
     const captures = legalMoves.filter(m => m.capture);
-    bestMoves = captures.length > 0
-      ? [captures[Math.floor(Math.random() * captures.length)]]
-      : [legalMoves[Math.floor(Math.random() * legalMoves.length)]];
-  } else if (level === 'medium') {
-    // Minimax profundidad 3
-    for (const move of legalMoves) {
-      const cloned = engine.clone();
-      cloned.makeMove(move.from, move.to);
-      const score = minimax(cloned, 2, false, aiColor);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMoves = [move];
-      } else if (score === bestScore) {
-        bestMoves.push(move);
-      }
-    }
-  } else if (level === 'hard') {
-    // Alfa-beta profundidad 3
-    for (const move of legalMoves) {
-      const cloned = engine.clone();
-      cloned.makeMove(move.from, move.to);
-      const score = alphabeta(cloned, 2, -Infinity, Infinity, false, aiColor);
-      if (score > bestScore) {
-        bestScore = score;
-        bestMoves = [move];
-      } else if (score === bestScore) {
-        bestMoves.push(move);
-      }
-    }
+    bestMoves = captures.length > 0 ? [captures[Math.floor(Math.random() * captures.length)]] : [legalMoves[Math.floor(Math.random() * legalMoves.length)]];
   } else {
-    bestMoves = [legalMoves[Math.floor(Math.random() * legalMoves.length)]];
+    const depth = level === 'medium' ? 1 : 2;
+    for (const move of legalMoves) {
+      const cloned = engine.clone();
+      cloned.makeMove(move.from, move.to);
+      const score = level === 'medium'
+        ? minimax(cloned, depth - 1, false, aiColor)
+        : alphabeta(cloned, depth - 1, -Infinity, Infinity, false, aiColor);
+      if (score > bestScore) {
+        bestScore = score;
+        bestMoves = [move];
+      } else if (score === bestScore) {
+        bestMoves.push(move);
+      }
+    }
   }
 
-  // Desempate aleatorio entre los mejores movimientos
   const selectedMove = bestMoves[Math.floor(Math.random() * bestMoves.length)];
-
   const moved = engine.makeMove(selectedMove.from, selectedMove.to);
-  return moved ? { from: selectedMove.from, to: selectedMove.to } : null;
+  const opponent = engine.getCurrentTurn();
+  const isMate = !engine.hasAnyLegalMove(opponent) && engine.isInCheck(opponent);
+
+  return moved ? {
+    from: selectedMove.from,
+    to: selectedMove.to,
+    capture: selectedMove.capture,
+    checkmate: isMate
+  } : null;
 }

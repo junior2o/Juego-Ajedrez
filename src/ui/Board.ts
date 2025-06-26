@@ -296,6 +296,17 @@ function triggerAIMove(engine: Engine): void {
     return;
   }
 
+  if (move.checkmate) {
+  const winnerColor = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
+  const resultMessage = winnerColor === config.playerColor
+    ? '¡Has ganado! (Jaque mate)'
+    : '¡Has perdido! (Jaque mate)';
+
+  setTimeout(() => {
+    showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
+  }, 300);
+  return;
+}
   const boardDiv = document.getElementById('chess-board');
   // --- Simula drag y animación visual del movimiento de la IA ---
   if (boardDiv) {

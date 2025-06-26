@@ -29,6 +29,7 @@ export class Engine {
   private currentTurn: 'white' | 'black';
   private hasMoved: { [key: string]: boolean } = {};
   private enPassantTarget: Position | null = null;
+  private moveHistory: { from: Position; to: Position }[] = [];
 
   constructor(initialPosition: Square[][]) {
     this.board = deepCloneBoard(initialPosition);
@@ -40,6 +41,7 @@ export class Engine {
     clone.currentTurn = this.currentTurn;
     clone.hasMoved = { ...this.hasMoved };
     clone.enPassantTarget = this.enPassantTarget ? { ...this.enPassantTarget } : null;
+    clone.moveHistory = [...this.moveHistory];
     return clone;
   }
 
@@ -82,6 +84,10 @@ export class Engine {
     return this.currentTurn;
   }
 
+  getMoveHistory(): { from: Position; to: Position }[] {
+    return [...this.moveHistory];
+  }
+
   makeMove(from: Position, to: Position): boolean {
     const piece = this.board[from.row][from.col];
     if (!piece) return false;
@@ -97,8 +103,9 @@ export class Engine {
   applyMove(from: Position, to: Position): void {
     const piece = this.board[from.row][from.col]!;
 
-    // Cambia la clave a piece.id
     this.hasMoved[piece.id] = true;
+
+    this.moveHistory.push({ from: { ...from }, to: { ...to } });
 
     if (piece.type === 'pawn' && this.enPassantTarget && to.row === this.enPassantTarget.row && to.col === this.enPassantTarget.col) {
       const dir = piece.color === 'white' ? 1 : -1;
@@ -128,7 +135,6 @@ export class Engine {
 
     const lastRow = piece.color === 'white' ? 0 : 7;
     if (piece.type === 'pawn' && to.row === lastRow) {
-      // Promoción: crea una nueva reina con id único
       this.board[to.row][to.col] = {
         id: getUniqueId(),
         type: 'queen',
@@ -222,20 +228,19 @@ export class Engine {
   }
 
   hasAnyLegalMove(color: 'white' | 'black'): boolean {
-  for (let row = 0; row < 8; row++) {
-    for (let col = 0; col < 8; col++) {
-      const piece = this.board[row][col];
-      if (piece?.color === color) {
-        if (this.getLegalMoves({ row, col }).length > 0) {
-          return true;
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const piece = this.board[row][col];
+        if (piece?.color === color) {
+          if (this.getLegalMoves({ row, col }).length > 0) {
+            return true;
+          }
         }
       }
     }
+    return false;
   }
-  return false;
-}
 
-  // --- Método privado para movimientos de ataque sin filtrar por jaque ---
   private getRawMoves(from: Position, forAttack = false): Position[] {
     const piece = this.board[from.row][from.col];
     if (!piece) return [];
@@ -262,7 +267,7 @@ export class Engine {
           }
         }
       }
-      // Ataques diagonales (siempre, para forAttack)
+
       for (const dc of [-1, 1]) {
         const col = from.col + dc;
         const row = from.row + dir;
