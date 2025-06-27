@@ -5,7 +5,10 @@ import { WebSocketManager } from './network/WebSocketManager';
 import { initWebSocketListeners } from './network/initWebSocketListeners';
 
 initWebSocketListeners();
+const host = location.hostname === 'localhost'
+  ? 'ws://localhost:3000'
+  : 'wss://cheess-game.onrender.com';
 
-WebSocketManager.getInstance().connect('ws://localhost:3000');
+WebSocketManager.getInstance().connect(host);
 
 // El menú principal se mostrará automáticamente desde el listener 'init'
