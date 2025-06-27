@@ -1,7 +1,6 @@
 // server/src/server.ts
 
 import { WebSocketServer, WebSocket } from 'ws';
-import { v4 as uuidv4 } from 'uuid';
 
 interface Player {
   id: string;
@@ -15,6 +14,19 @@ const players: Map<string, Player> = new Map();
 
 console.log('[Server] WebSocket server running on ws://localhost:3000');
 
+let waitingRandomPlayer: Player | null = null;
+
+
+// Generador de ID tipo PlayerXXXXXX (único)
+function generateUniquePlayerId(): string {
+  let id: string;
+  do {
+    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6 dígitos
+    id = `Player${randomNumber}`;
+  } while (players.has(id));
+  return id;
+}
+
 function sendToPlayer(playerId: string, message: any) {
   const player = players.get(playerId);
   if (player && player.socket.readyState === WebSocket.OPEN) {
@@ -26,25 +38,40 @@ function sendToPlayer(playerId: string, message: any) {
 }
 
 wss.on('connection', (socket) => {
-  const id = uuidv4();
-  players.set(id, { id, socket, inGame: false });
-  console.log(`[Server] New connection: ${id}`);
+  let assignedId: string | null = null;
 
-  socket.send(
-    JSON.stringify({ type: 'init', id: id }));
-  
-  
   socket.on('message', (data) => {
     try {
       const msg = JSON.parse(data.toString());
       console.log('[Server] Mensaje recibido:', msg);
 
       switch (msg.type) {
+        case 'init_with_id': {
+          const requestedId = msg.id;
+
+          // Permitir reutilizar el ID si el socket anterior ya está cerrado o no existe
+          const existingPlayer = players.get(requestedId);
+          if (
+            !requestedId ||
+            (existingPlayer && existingPlayer.socket.readyState === WebSocket.OPEN)
+          ) {
+            assignedId = generateUniquePlayerId();
+          } else {
+            assignedId = requestedId;
+          }
+
+          if (assignedId !== null) {
+            players.set(assignedId, { id: assignedId, socket, inGame: false });
+            socket.send(JSON.stringify({ type: 'init', id: assignedId }));
+            console.log(`[Server] ID asignado: ${assignedId}`);
+          }
+          break;
+        }
         case 'join_request': {
           const target = players.get(msg.toId);
           if (target && !target.inGame) {
-             console.log(`[Server] Reenviando join_request de ${msg.fromId} a ${msg.toId}`);
-            sendToPlayer(msg.toId, msg); // forward the request
+            console.log(`[Server] Reenviando join_request de ${msg.fromId} a ${msg.toId}`);
+            sendToPlayer(msg.toId, msg);
           } else {
             sendToPlayer(msg.fromId, {
               type: 'join_response',
@@ -54,6 +81,7 @@ wss.on('connection', (socket) => {
           }
           break;
         }
+
         case 'join_response': {
           if (msg.accepted) {
             const playerA = players.get(msg.fromId);
@@ -66,22 +94,15 @@ wss.on('connection', (socket) => {
               const white = Math.random() < 0.5 ? playerA.id : playerB.id;
               const black = white === playerA.id ? playerB.id : playerA.id;
 
-              console.log(`[Server] Starting game between ${white} (white) and ${black} (black)`);  
-              sendToPlayer(white, {
-                type: 'start_game',
-                whiteId: white,
-                blackId: black,
-              });
-              sendToPlayer(black, {
-                type: 'start_game',
-                whiteId: white,
-                blackId: black,
-              });
+              console.log(`[Server] Starting game between ${white} (white) and ${black} (black)`);
+              sendToPlayer(white, { type: 'start_game', whiteId: white, blackId: black });
+              sendToPlayer(black, { type: 'start_game', whiteId: white, blackId: black });
             }
           }
           sendToPlayer(msg.toId, msg);
           break;
         }
+
         case 'move': {
           const player = players.get(msg.playerId);
           if (player && player.opponentId) {
@@ -89,6 +110,40 @@ wss.on('connection', (socket) => {
           }
           break;
         }
+          case 'find_random_opponent': {
+            const player = players.get(msg.id);
+
+            if (!player) {
+              console.warn(`[Server] Jugador con ID ${msg.id} no encontrado para emparejamiento aleatorio.`);
+              break;
+            }
+
+            if (waitingRandomPlayer && waitingRandomPlayer.id !== msg.id && !waitingRandomPlayer.inGame) {
+              const playerA = waitingRandomPlayer;
+              const playerB = player;
+
+              playerA.inGame = true;
+              playerB.inGame = true;
+              playerA.opponentId = playerB.id;
+              playerB.opponentId = playerA.id;
+
+              const white = Math.random() < 0.5 ? playerA.id : playerB.id;
+              const black = white === playerA.id ? playerB.id : playerA.id;
+
+              sendToPlayer(white, { type: 'start_game', whiteId: white, blackId: black });
+              sendToPlayer(black, { type: 'start_game', whiteId: white, blackId: black });
+
+              console.log(`[Server] Emparejados aleatoriamente: ${white} (white) vs ${black} (black)`);
+
+              waitingRandomPlayer = null;
+            } else {
+              waitingRandomPlayer = player;
+              console.log(`[Server] ${msg.id} está esperando emparejamiento aleatorio`);
+            }
+
+            break;
+          }
+
       }
     } catch (err) {
       console.error('[Server] Invalid message:', data.toString());
@@ -96,21 +151,21 @@ wss.on('connection', (socket) => {
   });
 
   socket.on('close', () => {
-    const player = players.get(id);
-    if (player && player.opponentId) {
-      // Notifica al oponente que este jugador se ha desconectado
-      sendToPlayer(player.opponentId, {
-        type: 'opponent_disconnected',
-        playerId: id,
-      });
-      // Libera al oponente para que pueda jugar otra partida
-      const opponent = players.get(player.opponentId);
-      if (opponent) {
-        opponent.inGame = false;
-        opponent.opponentId = undefined;
+    if (assignedId) {
+      const player = players.get(assignedId);
+      if (player && player.opponentId) {
+        sendToPlayer(player.opponentId, {
+          type: 'opponent_disconnected',
+          playerId: assignedId,
+        });
+        const opponent = players.get(player.opponentId);
+        if (opponent) {
+          opponent.inGame = false;
+          opponent.opponentId = undefined;
+        }
       }
+      players.delete(assignedId);
+      console.log(`[Server] Disconnected: ${assignedId}`);
     }
-    players.delete(id);
-    console.log(`[Server] Disconnected: ${id}`);
   });
 });

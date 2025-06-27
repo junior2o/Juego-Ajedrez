@@ -6,13 +6,20 @@ export type MessageType =
   | 'start_game'
   | 'error'
   | 'opponent_disconnected'
-  | 'init';
+  | 'init'
+  | 'init_with_id'
+  | 'find_random_opponent'; 
 
 export interface InitMessage {
   type: 'init';
   id: string;
 }
 
+
+export interface InitWithIdMessage {
+  type: 'init_with_id';
+  id: string;
+}
 
 export interface MessageBase {
   type: MessageType;
@@ -54,15 +61,21 @@ export interface OpponentDisconnectedMessage extends MessageBase {
   playerId: string;
 }
 
+export interface FindRandomOpponentMessage extends MessageBase {
+  type: 'find_random_opponent';
+  id: string;
+}
 
 export type GameMessage =
   | InitMessage
+  | InitWithIdMessage 
   | JoinRequestMessage
   | JoinResponseMessage
   | StartGameMessage
   | ErrorMessage
   | OpponentDisconnectedMessage
-  | MoveMessage;
+  | MoveMessage
+  | FindRandomOpponentMessage;
 
 export type MessageMap = {
   join_request: JoinRequestMessage;
@@ -70,7 +83,6 @@ export type MessageMap = {
   start_game: StartGameMessage;
   opponent_disconnected: OpponentDisconnectedMessage;
   init: InitMessage;
+  init_with_id: InitWithIdMessage;
+  find_random_opponent: FindRandomOpponentMessage; 
 };
-
-
-

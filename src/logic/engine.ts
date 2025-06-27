@@ -1,3 +1,5 @@
+// ../logic/engine.ts
+
 export type Position = {
   row: number;
   col: number;
@@ -112,6 +114,7 @@ export class Engine {
       this.board[to.row + dir][to.col] = null;
     }
 
+    // Enroque: mueve la torre
     if (piece.type === 'king' && Math.abs(to.col - from.col) === 2) {
       const row = from.row;
       if (to.col === 6) {
@@ -218,6 +221,44 @@ export class Engine {
       for (const [dr, dc] of [[-1, -1], [-1, 0], [-1, 1], [0, -1], [0, 1], [1, -1], [1, 0], [1, 1]]) {
         add(from.row + dr, from.col + dc);
       }
+
+      // --- ENROQUE ---
+      // Solo si el rey no se ha movido y no está en jaque
+      if (!this.hasMoved[piece.id] && !this.isInCheck(color)) {
+        const row = from.row;
+        // Enroque corto (rey lado rey)
+        const rookShort = this.board[row][7];
+        if (
+          rookShort &&
+          rookShort.type === 'rook' &&
+          rookShort.color === color &&
+          !this.hasMoved[rookShort.id] &&
+          this.board[row][5] === null &&
+          this.board[row][6] === null
+        ) {
+          // Verifica que las casillas que atraviesa el rey no estén atacadas
+          const squaresSafe = !this.isAttacked({ row, col: 5 }, color) && !this.isAttacked({ row, col: 6 }, color);
+          if (squaresSafe) {
+            moves.push({ row, col: 6 });
+          }
+        }
+        // Enroque largo (rey lado dama)
+        const rookLong = this.board[row][0];
+        if (
+          rookLong &&
+          rookLong.type === 'rook' &&
+          rookLong.color === color &&
+          !this.hasMoved[rookLong.id] &&
+          this.board[row][1] === null &&
+          this.board[row][2] === null &&
+          this.board[row][3] === null
+        ) {
+          const squaresSafe = !this.isAttacked({ row, col: 2 }, color) && !this.isAttacked({ row, col: 3 }, color);
+          if (squaresSafe) {
+            moves.push({ row, col: 2 });
+          }
+        }
+      }
     }
 
     return moves.filter(to => {
@@ -307,5 +348,22 @@ export class Engine {
     }
 
     return moves;
+  }
+
+  // --- Añadido para enroque ---
+  private isAttacked(pos: Position, color: 'white' | 'black'): boolean {
+    const enemyColor = color === 'white' ? 'black' : 'white';
+    for (let r = 0; r < 8; r++) {
+      for (let c = 0; c < 8; c++) {
+        const piece = this.board[r][c];
+        if (piece && piece.color === enemyColor) {
+          const moves = this.getRawMoves({ row: r, col: c }, true);
+          if (moves.some(m => m.row === pos.row && m.col === pos.col)) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
   }
 }

@@ -1,4 +1,6 @@
-import { GameMessage, MessageMap, MessageType } from './messages';
+// ../network/WebSocketManager.ts
+
+import { GameMessage, MessageType, InitWithIdMessage } from './messages';
 
 type Callback = (msg: GameMessage) => void;
 
@@ -23,14 +25,23 @@ export class WebSocketManager {
     this.socket = new WebSocket(url);
 
     this.socket.onopen = () => {
-      console.log('[WebSocket] Connected');
-      this.isConnected = true;
+    console.log('[WebSocket] Connected');
+    this.isConnected = true;
 
-      while (this.messageQueue.length > 0) {
-        const msg = this.messageQueue.shift();
-        if (msg) this.send(msg);
-      }
+    // Siempre envía init_with_id, aunque no haya ID guardado
+    const storedId = localStorage.getItem('playerId') || '';
+    const initMsg: InitWithIdMessage = {
+      type: 'init_with_id',
+      id: storedId,
     };
+    this.send(initMsg);
+    console.log('[WebSocket] Sent init_with_id:', storedId);
+
+    while (this.messageQueue.length > 0) {
+      const msg = this.messageQueue.shift();
+      if (msg) this.send(msg);
+    }
+};
 
     this.socket.onmessage = (event) => {
       try {
@@ -81,8 +92,7 @@ export class WebSocketManager {
     if (handlers && handlers.length > 0) {
       handlers.forEach((cb) => cb(message));
     } else if (!(type in this.callbacks)) {
-    // Solo muestra el warning si el tipo es realmente desconocido
-    console.warn('[WebSocket] Invalid message received:', JSON.stringify(message));
+      console.warn('[WebSocket] Unhandled message type:', type, message);
+    }
   }
-}
 }

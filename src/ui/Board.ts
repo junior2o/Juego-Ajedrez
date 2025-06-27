@@ -141,28 +141,30 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
       if (piece) {
         const img = document.createElement('img');
         const isKingInCheck: boolean =
-          piece.type === 'king' &&
-          ((piece.color === 'white' && whiteInCheck) ||
-            (piece.color === 'black' && blackInCheck));
+        piece.type === 'king' &&
+        ((piece.color === 'white' && whiteInCheck) ||
+          (piece.color === 'black' && blackInCheck));
 
-        if (isKingInCheck) {
-          square.classList.add('in-check');
-        }
+      if (isKingInCheck) {
+        square.classList.add('in-check');
+      }
 
-        const imageToShow = isKingInCheck
-          ? `${piece.color}_king_check.png`
-          : piece.image;
+      const imageToShow = isKingInCheck
+        ? `${piece.color}_king_check.png`
+        : piece.image;
 
-        img.src = `/assets/pieces/${imageToShow}`;
-        img.dataset.defaultSrc = piece.image;
-        img.dataset.dragSrc = piece.dragImage || piece.image;
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.objectFit = 'contain';
-        img.draggable = false;
+      // Si el rey está en jaque, el drag también debe ser la imagen de jaque
+      img.src = `/assets/pieces/${imageToShow}`;
+      img.dataset.defaultSrc = piece.image;
+      img.dataset.dragSrc = isKingInCheck
+        ? `${piece.color}_king_check.png`
+        : (piece.dragImage || piece.image);
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'contain';
+      img.draggable = false;
 
-        square.draggable = true;
-
+square.draggable = true;
         square.addEventListener('dragstart', (e) => {
           if (config.mode === 'online' && !canMove()) {
             e.preventDefault();
@@ -183,7 +185,16 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
         });
 
         square.addEventListener('dragend', () => {
-          img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+          // Si el rey sigue en jaque, deja la imagen de jaque
+          if (
+            piece.type === 'king' &&
+            ((piece.color === 'white' && engine.isInCheck('white')) ||
+            (piece.color === 'black' && engine.isInCheck('black')))
+          ) {
+            img.src = `/assets/pieces/${piece.color}_king_check.png`;
+          } else {
+            img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+          }
           img.style.visibility = 'visible';
           audioManager.play('drag');
         });
