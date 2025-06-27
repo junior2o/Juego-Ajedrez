@@ -1,5 +1,7 @@
 // server/src/server.ts
 
+import http from 'http';
+import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 
 interface Player {
@@ -9,19 +11,21 @@ interface Player {
   opponentId?: string;
 }
 
-const wss = new WebSocketServer({ port: 3000 });
+const app = express();
+const server = http.createServer(app);
+const PORT = process.env.PORT || 3000;
+
+const wss = new WebSocketServer({ server });
 const players: Map<string, Player> = new Map();
-
-console.log('[Server] WebSocket server running on ws://localhost:3000');
-
 let waitingRandomPlayer: Player | null = null;
 
+console.log(`[Server] WebSocket server running on port ${PORT}`);
 
 // Generador de ID tipo PlayerXXXXXX (único)
 function generateUniquePlayerId(): string {
   let id: string;
   do {
-    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6 dígitos
+    const randomNumber = Math.floor(100000 + Math.random() * 900000);
     id = `Player${randomNumber}`;
   } while (players.has(id));
   return id;
@@ -49,7 +53,6 @@ wss.on('connection', (socket) => {
         case 'init_with_id': {
           const requestedId = msg.id;
 
-          // Permitir reutilizar el ID si el socket anterior ya está cerrado o no existe
           const existingPlayer = players.get(requestedId);
           if (
             !requestedId ||
@@ -67,6 +70,7 @@ wss.on('connection', (socket) => {
           }
           break;
         }
+
         case 'join_request': {
           const target = players.get(msg.toId);
           if (target && !target.inGame) {
@@ -110,40 +114,40 @@ wss.on('connection', (socket) => {
           }
           break;
         }
-          case 'find_random_opponent': {
-            const player = players.get(msg.id);
 
-            if (!player) {
-              console.warn(`[Server] Jugador con ID ${msg.id} no encontrado para emparejamiento aleatorio.`);
-              break;
-            }
+        case 'find_random_opponent': {
+          const player = players.get(msg.id);
 
-            if (waitingRandomPlayer && waitingRandomPlayer.id !== msg.id && !waitingRandomPlayer.inGame) {
-              const playerA = waitingRandomPlayer;
-              const playerB = player;
-
-              playerA.inGame = true;
-              playerB.inGame = true;
-              playerA.opponentId = playerB.id;
-              playerB.opponentId = playerA.id;
-
-              const white = Math.random() < 0.5 ? playerA.id : playerB.id;
-              const black = white === playerA.id ? playerB.id : playerA.id;
-
-              sendToPlayer(white, { type: 'start_game', whiteId: white, blackId: black });
-              sendToPlayer(black, { type: 'start_game', whiteId: white, blackId: black });
-
-              console.log(`[Server] Emparejados aleatoriamente: ${white} (white) vs ${black} (black)`);
-
-              waitingRandomPlayer = null;
-            } else {
-              waitingRandomPlayer = player;
-              console.log(`[Server] ${msg.id} está esperando emparejamiento aleatorio`);
-            }
-
+          if (!player) {
+            console.warn(`[Server] Jugador con ID ${msg.id} no encontrado para emparejamiento aleatorio.`);
             break;
           }
 
+          if (waitingRandomPlayer && waitingRandomPlayer.id !== msg.id && !waitingRandomPlayer.inGame) {
+            const playerA = waitingRandomPlayer;
+            const playerB = player;
+
+            playerA.inGame = true;
+            playerB.inGame = true;
+            playerA.opponentId = playerB.id;
+            playerB.opponentId = playerA.id;
+
+            const white = Math.random() < 0.5 ? playerA.id : playerB.id;
+            const black = white === playerA.id ? playerB.id : playerA.id;
+
+            sendToPlayer(white, { type: 'start_game', whiteId: white, blackId: black });
+            sendToPlayer(black, { type: 'start_game', whiteId: white, blackId: black });
+
+            console.log(`[Server] Emparejados aleatoriamente: ${white} (white) vs ${black} (black)`);
+
+            waitingRandomPlayer = null;
+          } else {
+            waitingRandomPlayer = player;
+            console.log(`[Server] ${msg.id} está esperando emparejamiento aleatorio`);
+          }
+
+          break;
+        }
       }
     } catch (err) {
       console.error('[Server] Invalid message:', data.toString());
@@ -168,4 +172,8 @@ wss.on('connection', (socket) => {
       console.log(`[Server] Disconnected: ${assignedId}`);
     }
   });
+});
+
+server.listen(PORT, () => {
+  console.log(`[Server] Server listening on port ${PORT}`);
 });

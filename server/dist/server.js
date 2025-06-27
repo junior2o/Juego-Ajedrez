@@ -1,16 +1,24 @@
 "use strict";
 // server/src/server.ts
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
 Object.defineProperty(exports, "__esModule", { value: true });
+const http_1 = __importDefault(require("http"));
+const express_1 = __importDefault(require("express"));
 const ws_1 = require("ws");
-const wss = new ws_1.WebSocketServer({ port: 3000 });
+const app = (0, express_1.default)();
+const server = http_1.default.createServer(app);
+const PORT = process.env.PORT || 3000;
+const wss = new ws_1.WebSocketServer({ server });
 const players = new Map();
-console.log('[Server] WebSocket server running on ws://localhost:3000');
 let waitingRandomPlayer = null;
+console.log(`[Server] WebSocket server running on port ${PORT}`);
 // Generador de ID tipo PlayerXXXXXX (único)
 function generateUniquePlayerId() {
     let id;
     do {
-        const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6 dígitos
+        const randomNumber = Math.floor(100000 + Math.random() * 900000);
         id = `Player${randomNumber}`;
     } while (players.has(id));
     return id;
@@ -34,7 +42,6 @@ wss.on('connection', (socket) => {
             switch (msg.type) {
                 case 'init_with_id': {
                     const requestedId = msg.id;
-                    // Permitir reutilizar el ID si el socket anterior ya está cerrado o no existe
                     const existingPlayer = players.get(requestedId);
                     if (!requestedId ||
                         (existingPlayer && existingPlayer.socket.readyState === ws_1.WebSocket.OPEN)) {
@@ -141,4 +148,7 @@ wss.on('connection', (socket) => {
             console.log(`[Server] Disconnected: ${assignedId}`);
         }
     });
+});
+server.listen(PORT, () => {
+    console.log(`[Server] Server listening on port ${PORT}`);
 });
