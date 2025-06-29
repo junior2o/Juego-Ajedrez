@@ -13,7 +13,7 @@ const PORT = process.env.PORT || 3000;
 // --- SERVIR FRONTEND ---
 const staticPath = path_1.default.join(__dirname, '../../dist');
 app.use(express_1.default.static(staticPath));
-app.get('*', (req, res) => {
+app.get(/.*/, (req, res) => {
     res.sendFile(path_1.default.join(staticPath, 'index.html'));
 });
 // --- FIN SERVIR FRONTEND ---

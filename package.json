@@ -4,10 +4,15 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build"
+    "build": "vite build",
+    "build-all": "npm run build-frontend && npm run build-backend && npm run copy-frontend",
+    "build-frontend": "vite build",
+    "build-backend": "cd server && npm run build",
+    "copy-frontend": "rd /s /q server\\dist && xcopy dist server\\dist /E /I /Y"
   },
   "devDependencies": {
     "vite": "^6.3.5"
   }
 }
+
 
