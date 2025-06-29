@@ -1,8 +1,7 @@
-// server/src/server.ts
-
 import http from 'http';
 import express from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
+import path from 'path';
 
 interface Player {
   id: string;
@@ -14,6 +13,14 @@ interface Player {
 const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+
+// --- SERVIR FRONTEND ---
+const staticPath = path.join(__dirname, '../../dist');
+app.use(express.static(staticPath));
+app.get('*', (req, res) => {
+  res.sendFile(path.join(staticPath, 'index.html'));
+});
+// --- FIN SERVIR FRONTEND ---
 
 const wss = new WebSocketServer({ server });
 const players: Map<string, Player> = new Map();

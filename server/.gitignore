@@ -2,8 +2,7 @@
 node_modules/
 .env
 
-# Compilación de TypeScript
-dist/
+
 
 # Archivos temporales del sistema
 .DS_Store

@@ -1,5 +1,4 @@
 "use strict";
-// server/src/server.ts
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
@@ -7,9 +6,17 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const http_1 = __importDefault(require("http"));
 const express_1 = __importDefault(require("express"));
 const ws_1 = require("ws");
+const path_1 = __importDefault(require("path"));
 const app = (0, express_1.default)();
 const server = http_1.default.createServer(app);
 const PORT = process.env.PORT || 3000;
+// --- SERVIR FRONTEND ---
+const staticPath = path_1.default.join(__dirname, '../../dist');
+app.use(express_1.default.static(staticPath));
+app.get('*', (req, res) => {
+    res.sendFile(path_1.default.join(staticPath, 'index.html'));
+});
+// --- FIN SERVIR FRONTEND ---
 const wss = new ws_1.WebSocketServer({ server });
 const players = new Map();
 let waitingRandomPlayer = null;
