@@ -24,3 +24,10 @@
   user-select: none;
   pointer-events: none;
 }
+.selected-cell {
+  outline: 3px solid rgba(255, 255, 0, 0.9); /* borde amarillo brillante */
+  outline-offset: -4px;
+  box-shadow: 0 0 12px 4px rgba(255, 255, 0, 0.6); /* resplandor */
+  transition: box-shadow 0.2s ease, outline 0.2s ease;
+  z-index: 2;
+}

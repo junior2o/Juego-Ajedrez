@@ -1,19 +1,16 @@
-//  src/ui/Board.ts
-import { audioManager } from './AudioManager';
+import { AudioManager } from './AudioManager';
 import { initialPosition } from '../logic/initialPosition';
 import { Engine, Position, Square } from '../logic/engine';
 import { renderTimers } from './renderTimers';
-import { timerManager, TimeControl } from '../logic/TimerManager';
+import { timerManager, TimeControl } from '../logic/TimerManager'; // Importa timerManager global
 import { playAIMove } from '../logic/ai';
 import { showGameOverModal } from './GameOverModal';
 import { showGameModeSelector } from './GameModeSelector';
 import { gameConfigManager } from '../config/GameConfigManager';
 import { canMove, sendMove, getRemoteEngine } from '../logic/remoteGame';
 
-
+const audioManager = new AudioManager();
 let isPlayerTurn = true;
-let selectedFrom: Position | null = null;
-let selectedCellElement: HTMLElement | null = null;
 
 function preloadAllPieceImages(): void {
   const basePieces = ['rook','rook2', 'knight', 'knight2', 'bishop', 'bishop2', 'queen', 'king'];
@@ -38,6 +35,7 @@ function preloadAllPieceImages(): void {
         if (suffix === '_check' && piece !== 'king') continue;
 
         const file = `${color}_${piece}${suffix}.png`;
+        // Evita duplicados
         if (!document.getElementById(file)) {
           const img = new Image();
           img.id = file;
@@ -59,6 +57,7 @@ export function showBoard(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
 
+  // Crear el contenedor del tablero si no existe
   let boardHolder = document.getElementById('board-holder');
   if (!boardHolder) {
     boardHolder = document.createElement('div');
@@ -66,9 +65,12 @@ export function showBoard(): void {
     container.appendChild(boardHolder);
   }
 
+  // Precargar imágenes
   preloadAllPieceImages();
 
   const config = gameConfigManager.getConfig();
+
+  // Inicializar lógica
   let engine: Engine;
   if (config.mode === 'online') {
     engine = getRemoteEngine(); 
@@ -76,10 +78,12 @@ export function showBoard(): void {
     engine = new Engine(initialPosition); 
   }
 
+ 
   renderTimers(container, timerManager);
   renderBoard(engine, engine.getBoard());
 
   isPlayerTurn = config.mode !== 'ai' || config.playerColor === 'white';
+
   timerManager.startTurn(engine.getCurrentTurn());
 
   if (config.mode === 'ai' && config.playerColor === 'black') {
@@ -93,6 +97,7 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
     return;
   }
 
+  // Asegura que el contenedor board-holder exista
   let boardHolder = document.getElementById('board-holder');
   if (!boardHolder) {
     const container = document.getElementById('app');
@@ -117,6 +122,8 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
   boardHolder.innerHTML = '';
   boardHolder.appendChild(boardDiv);
 
+  let from: Position | null = null;
+
   const whiteInCheck = engine.isInCheck('white');
   const blackInCheck = engine.isInCheck('black');
   const config = gameConfigManager.getConfig();
@@ -133,64 +140,91 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
       const piece = board[row][col];
       if (piece) {
         const img = document.createElement('img');
-        const isKingInCheck = piece.type === 'king' &&
-          ((piece.color === 'white' && whiteInCheck) ||
-           (piece.color === 'black' && blackInCheck));
+        const isKingInCheck: boolean =
+        piece.type === 'king' &&
+        ((piece.color === 'white' && whiteInCheck) ||
+          (piece.color === 'black' && blackInCheck));
 
-        if (isKingInCheck) {
-          square.classList.add('in-check');
-        }
+      if (isKingInCheck) {
+        square.classList.add('in-check');
+      }
 
-        const imageToShow = isKingInCheck
-          ? `${piece.color}_king_check.png`
-          : piece.image;
+      const imageToShow = isKingInCheck
+        ? `${piece.color}_king_check.png`
+        : piece.image;
 
-        img.src = `/assets/pieces/${imageToShow}`;
-        img.dataset.defaultSrc = piece.image;
-        img.style.width = '100%';
-        img.style.height = '100%';
-        img.style.objectFit = 'contain';
-        img.draggable = false;
+      // Si el rey está en jaque, el drag también debe ser la imagen de jaque
+      img.src = `/assets/pieces/${imageToShow}`;
+      img.dataset.defaultSrc = piece.image;
+      img.dataset.dragSrc = isKingInCheck
+        ? `${piece.color}_king_check.png`
+        : (piece.dragImage || piece.image);
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'contain';
+      img.draggable = false;
+
+square.draggable = true;
+        square.addEventListener('dragstart', (e) => {
+          if (config.mode === 'online' && !canMove()) {
+            e.preventDefault();
+            return;
+          }
+          const piece = engine.getBoard()[row][col];
+          if (!isPlayerTurn || !piece || piece.color !== config.playerColor) {
+            e.preventDefault();
+            return;
+          }
+
+          img.src = `/assets/pieces/${img.dataset.dragSrc}`;
+          setTimeout(() => {
+            img.style.visibility = 'hidden';
+          }, 0);
+
+          from = { row, col };
+        });
+
+        square.addEventListener('dragend', () => {
+          // Si el rey sigue en jaque, deja la imagen de jaque
+          if (
+            piece.type === 'king' &&
+            ((piece.color === 'white' && engine.isInCheck('white')) ||
+            (piece.color === 'black' && engine.isInCheck('black')))
+          ) {
+            img.src = `/assets/pieces/${piece.color}_king_check.png`;
+          } else {
+            img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+          }
+          img.style.visibility = 'visible';
+          audioManager.play('drag');
+        });
 
         square.appendChild(img);
       }
 
-      square.addEventListener('click', () => {
-        if (!isPlayerTurn || (config.mode === 'online' && !canMove())) {
+      square.addEventListener('dragover', (e) => e.preventDefault());
+
+      square.addEventListener('drop', () => {
+        if (config.mode === 'online' && !canMove()) {
           audioManager.play('error');
           return;
         }
+        if (!from || !isPlayerTurn) return;
+        const to = { row, col };
 
-        const clicked = { row, col };
-        const clickedPiece = board[row][col];
+        const targetPiece = engine.getBoard()[to.row][to.col];
+        const isCapture: boolean = targetPiece !== null;
 
-        if (!selectedFrom || (clickedPiece && clickedPiece.color === config.playerColor)) {
-          if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
-          if (clickedPiece && clickedPiece.color === config.playerColor) {
-            selectedFrom = clicked;
-            selectedCellElement = square;
-            square.classList.add('selected-cell');
-          } else {
-            selectedFrom = null;
-            selectedCellElement = null;
-            audioManager.play('error');
-          }
-          return;
-        }
-
-        const moveFrom = selectedFrom;
-        const isCapture = board[clicked.row][clicked.col] !== null;
-        const moved = engine.makeMove(moveFrom, clicked);
-
+        const moved: boolean = engine.makeMove(from, to);
         if (moved) {
-          audioManager.play(isCapture ? 'capture' : 'move');
-
-          selectedFrom = null;
-          if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
-          selectedCellElement = null;
-
           isPlayerTurn = false;
-          timerManager.addIncrement(config.playerColor);
+
+          if (isCapture) {
+            audioManager.play('capture');
+          }
+
+          const previousTurn = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
+          timerManager.addIncrement(previousTurn);
           timerManager.startTurn(engine.getCurrentTurn());
 
           if (engine.isInCheck(engine.getCurrentTurn())) {
@@ -199,8 +233,28 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
 
           renderBoard(engine, engine.getBoard());
 
+          const current = engine.getCurrentTurn();
+          const playerColor = config.playerColor;
+          const playerLost: boolean = engine.isInCheck(current) && current === playerColor;
+          const playerWon: boolean = engine.isInCheck(current) && current !== playerColor;
+          const isStalemate: boolean = !engine.isInCheck(current);
+
+          let resultMessage = '';
+          if (!engine.hasAnyLegalMove(current)) {
+            if (playerLost) {
+              resultMessage = '¡Has perdido! (Jaque mate)';
+            } else if (playerWon) {
+              resultMessage = '¡Has ganado! (Jaque mate)';
+            } else if (isStalemate) {
+              resultMessage = 'Tablas (ahogado)';
+            }
+
+            showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
+            return;
+          }
+
           if (config.mode === 'online') {
-            sendMove(moveFrom, clicked);
+            sendMove(from, to);
           }
 
           if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
@@ -208,12 +262,9 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
           } else {
             isPlayerTurn = true;
           }
-        } else {
-          audioManager.play('error');
-          selectedFrom = null;
-          if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
-          selectedCellElement = null;
         }
+
+        from = null;
       });
 
       boardDiv.appendChild(square);
@@ -221,9 +272,6 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
   }
 }
 
-
-// --- Mueve la IA ---
-// Esta función se encarga de que la IA haga su movimiento, ya sea en un juego local o en línea.
 function triggerAIMove(engine: Engine): void {
   const config = gameConfigManager.getConfig();
 
