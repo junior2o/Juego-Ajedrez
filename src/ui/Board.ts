@@ -10,7 +10,6 @@ import { showGameModeSelector } from './GameModeSelector';
 import { gameConfigManager } from '../config/GameConfigManager';
 import { canMove, sendMove, getRemoteEngine } from '../logic/remoteGame';
 
-
 let isPlayerTurn = true;
 let selectedFrom: Position | null = null;
 let selectedCellElement: HTMLElement | null = null;
@@ -55,6 +54,11 @@ function preloadAllPieceImages(): void {
 
 preloadAllPieceImages();
 
+document.addEventListener('click', function unlockAudioOnce() {
+  console.log('[AUDIO] Desbloqueando sonido con primer click');
+  // Solo desbloquea el contexto de audio, no reproduce ningún sonido aquí
+  document.removeEventListener('click', unlockAudioOnce);
+}, { once: true });
 export function showBoard(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
@@ -147,20 +151,99 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
 
         img.src = `/assets/pieces/${imageToShow}`;
         img.dataset.defaultSrc = piece.image;
+        img.dataset.dragSrc = isKingInCheck ? `${piece.color}_king_check.png` : (piece.dragImage || piece.image);
         img.style.width = '100%';
         img.style.height = '100%';
         img.style.objectFit = 'contain';
         img.draggable = false;
 
         square.appendChild(img);
+
+        // Restaurar drag
+        square.draggable = true;
+        square.addEventListener('dragstart', (e) => {
+          if (config.mode === 'online' && !canMove()) {
+            e.preventDefault();
+            return;
+          }
+          const piece = engine.getBoard()[row][col];
+          if (!isPlayerTurn || !piece || piece.color !== config.playerColor) {
+            e.preventDefault();
+            return;
+          }
+
+          img.src = `/assets/pieces/${img.dataset.dragSrc}`;
+          setTimeout(() => {
+            img.style.visibility = 'hidden';
+          }, 0);
+
+          selectedFrom = { row, col };
+        });
+
+        square.addEventListener('dragend', () => {
+          img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+          img.style.visibility = 'visible';
+          audioManager.play('drag');
+        });
+
+        square.addEventListener('dragover', (e) => e.preventDefault());
+
+        square.addEventListener('drop', () => {
+          if (config.mode === 'online' && !canMove()) {
+            audioManager.play('error');
+            return;
+          }
+          if (!selectedFrom || !isPlayerTurn) return;
+          const to = { row, col };
+          const targetPiece = engine.getBoard()[to.row][to.col];
+          const isCapture: boolean = targetPiece !== null;
+
+          const moved: boolean = engine.makeMove(selectedFrom, to);
+          if (moved) {
+            isPlayerTurn = false;
+            if (isCapture) audioManager.play('capture');
+            const previousTurn = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
+            timerManager.addIncrement(previousTurn);
+            timerManager.startTurn(engine.getCurrentTurn());
+            if (engine.isInCheck(engine.getCurrentTurn())) audioManager.play('check');
+
+            // Espera 100ms antes de redibujar el tablero para que el sonido se inicie
+            setTimeout(() => {
+              renderBoard(engine, engine.getBoard());
+
+              const current = engine.getCurrentTurn();
+              const playerColor = config.playerColor;
+              const playerLost = engine.isInCheck(current) && current === playerColor;
+              const playerWon = engine.isInCheck(current) && current !== playerColor;
+              const isStalemate = !engine.isInCheck(current);
+
+              let resultMessage = '';
+              if (!engine.hasAnyLegalMove(current)) {
+                if (playerLost) resultMessage = '¡Has perdido! (Jaque mate)';
+                else if (playerWon) resultMessage = '¡Has ganado! (Jaque mate)';
+                else if (isStalemate) resultMessage = 'Tablas (ahogado)';
+                showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
+                return;
+              }
+
+              if (config.mode === 'online' && selectedFrom) sendMove(selectedFrom, to);
+              if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
+                setTimeout(() => triggerAIMove(engine), 1000);
+              } else {
+                isPlayerTurn = true;
+              }
+            }, 200);
+          }
+          selectedFrom = null;
+        });
       }
 
+      // Clic para marcar origen o mover
       square.addEventListener('click', () => {
         if (!isPlayerTurn || (config.mode === 'online' && !canMove())) {
-          audioManager.play('error');
+          //audioManager.play('error');
           return;
         }
-
         const clicked = { row, col };
         const clickedPiece = board[row][col];
 
@@ -173,7 +256,6 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
           } else {
             selectedFrom = null;
             selectedCellElement = null;
-            audioManager.play('error');
           }
           return;
         }
@@ -183,32 +265,101 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
         const moved = engine.makeMove(moveFrom, clicked);
 
         if (moved) {
-          audioManager.play(isCapture ? 'capture' : 'move');
+  selectedFrom = null;
+  if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
+  selectedCellElement = null;
+  isPlayerTurn = false;
+  timerManager.addIncrement(config.playerColor);
+  timerManager.startTurn(engine.getCurrentTurn());
+  if (engine.isInCheck(engine.getCurrentTurn())) audioManager.play('check');
 
-          selectedFrom = null;
-          if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
-          selectedCellElement = null;
+  // --- Animación visual del movimiento del usuario ---
+  const boardDiv = document.getElementById('chess-board');
+  if (boardDiv) {
+    const fromIndex = moveFrom.row * 8 + moveFrom.col;
+    const toIndex = clicked.row * 8 + clicked.col;
+    const fromDiv = boardDiv.children[fromIndex] as HTMLElement;
+    const toDiv = boardDiv.children[toIndex] as HTMLElement;
+    const img = fromDiv?.querySelector('img');
 
-          isPlayerTurn = false;
-          timerManager.addIncrement(config.playerColor);
-          timerManager.startTurn(engine.getCurrentTurn());
+    if (img && toDiv) {
+      // Cambia a imagen drag y reproduce sonido drag
+      if (img.dataset.dragSrc) {
+        img.src = `/assets/pieces/${img.dataset.dragSrc}`;
+      }
+      //audioManager.play('drag');
 
-          if (engine.isInCheck(engine.getCurrentTurn())) {
-            audioManager.play('check');
-          }
+      setTimeout(() => {
+        const fromRect = img.getBoundingClientRect();
+        const toRect = toDiv.getBoundingClientRect();
 
-          renderBoard(engine, engine.getBoard());
+        const floatingImg = img.cloneNode(true) as HTMLImageElement;
+        floatingImg.style.position = 'fixed';
+        floatingImg.style.left = `${fromRect.left}px`;
+        floatingImg.style.top = `${fromRect.top}px`;
+        floatingImg.style.width = `${fromRect.width}px`;
+        floatingImg.style.height = `${fromRect.height}px`;
+        floatingImg.style.pointerEvents = 'none';
+        floatingImg.style.transition = 'left 0.4s linear, top 0.4s linear, opacity 0.1s';
 
-          if (config.mode === 'online') {
-            sendMove(moveFrom, clicked);
-          }
+        document.body.appendChild(floatingImg);
+        img.style.visibility = 'hidden';
 
-          if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
-            setTimeout(() => triggerAIMove(engine), 1000);
-          } else {
-            isPlayerTurn = true;
-          }
-        } else {
+        setTimeout(() => {
+          floatingImg.style.left = `${toRect.left}px`;
+          floatingImg.style.top = `${toRect.top}px`;
+        }, 10);
+
+        setTimeout(() => {
+          floatingImg.style.opacity = '0';
+          setTimeout(() => {
+            document.body.removeChild(floatingImg);
+            if (img.dataset.defaultSrc) {
+              img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+            }
+            img.style.visibility = 'visible';
+
+            // Ejecuta el movimiento real (ya lo hiciste antes, así que solo sonido)
+            if (isCapture) {
+              audioManager.play('capture');
+            } else {
+              audioManager.play('move');
+            }
+
+            const current = engine.getCurrentTurn();
+            if (engine.isInCheck(current)) audioManager.play('check');
+
+            renderBoard(engine, engine.getBoard());
+            if (config.mode === 'online') sendMove(moveFrom, clicked);
+            if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
+              setTimeout(() => triggerAIMove(engine), 1000);
+            } else {
+              isPlayerTurn = true;
+            }
+          }, 100);
+        }, 510);
+      }, 200);
+      return; // Salir para no ejecutar el movimiento dos veces
+    }
+  } else {
+
+    // Si no hay animación, ejecuta el movimiento real como antes
+    if (isCapture) {
+      audioManager.play('capture');
+    } else {
+      audioManager.play('move');
+    }
+    renderBoard(engine, engine.getBoard());
+    if (config.mode === 'online') sendMove(moveFrom, clicked);
+    if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
+      setTimeout(() => triggerAIMove(engine), 1000);
+    } else {
+      isPlayerTurn = true;
+    }
+  } 
+}
+          
+          else {
           audioManager.play('error');
           selectedFrom = null;
           if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
@@ -260,16 +411,16 @@ function triggerAIMove(engine: Engine): void {
   }
 
   if (move.checkmate) {
-  const winnerColor = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
-  const resultMessage = winnerColor === config.playerColor
-    ? '¡Has ganado! (Jaque mate)'
-    : '¡Has perdido! (Jaque mate)';
+    const winnerColor = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
+    const resultMessage = winnerColor === config.playerColor
+      ? '¡Has ganado! (Jaque mate)'
+      : '¡Has perdido! (Jaque mate)';
 
-  setTimeout(() => {
-    showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
-  }, 300);
-  return;
-}
+    setTimeout(() => {
+      showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
+    }, 300);
+    return;
+  }
   const boardDiv = document.getElementById('chess-board');
   // --- Simula drag y animación visual del movimiento de la IA ---
   if (boardDiv) {
@@ -284,7 +435,7 @@ function triggerAIMove(engine: Engine): void {
       if (img.dataset.dragSrc) {
         img.src = `/assets/pieces/${img.dataset.dragSrc}`;
       }
-      audioManager.play('drag');
+      
 
       // Espera un poco y luego anima el movimiento
       setTimeout(() => {
