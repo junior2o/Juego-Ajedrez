@@ -38,7 +38,7 @@ function preloadAllPieceImages(): void {
         // Evita duplicados
         if (!document.getElementById(file)) {
           const img = new Image();
-          img.id = file;
+          img.id = file; 
           img.src = `/assets/pieces/${file}`;
           img.style.width = '1px';
           img.style.height = '1px';

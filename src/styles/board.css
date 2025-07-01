@@ -31,3 +31,26 @@
   transition: box-shadow 0.2s ease, outline 0.2s ease;
   z-index: 2;
 }
+
+.last-move-cell {
+  outline: 3px solid rgba(0, 200, 255, 0.9); /* borde azul brillante */
+  outline-offset: -4px;
+  box-shadow: 0 0 12px 4px rgba(0, 200, 255, 0.6); /* resplandor azul */
+  transition: box-shadow 0.2s ease, outline 0.2s ease;
+  z-index: 2;
+}
+.legal-move-dot {
+  position: absolute !important;
+  top: 50% !important;
+  left: 50% !important;
+  width: 22% !important;
+  height: 22% !important;
+  background: rgba(80, 80, 80, 0.35) !important; /* Más translúcido y moderno */
+  border-radius: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  pointer-events: none !important;
+  z-index: 20 !important; /* Asegura que esté por encima del fondo pero debajo de la pieza */
+  border: 2px solid #ffffff !important;
+  box-sizing: border-box !important;
+  backdrop-filter: blur(1px); /* (opcional) Suaviza el punto con un efecto sutil */
+}

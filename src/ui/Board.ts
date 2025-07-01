@@ -1,4 +1,4 @@
-//  src/ui/Board.ts
+//src/ui/Board.ts
 import { audioManager } from './AudioManager';
 import { initialPosition } from '../logic/initialPosition';
 import { Engine, Position, Square } from '../logic/engine';
@@ -9,10 +9,13 @@ import { showGameOverModal } from './GameOverModal';
 import { showGameModeSelector } from './GameModeSelector';
 import { gameConfigManager } from '../config/GameConfigManager';
 import { canMove, sendMove, getRemoteEngine } from '../logic/remoteGame';
+import '../styles/board.css';
 
 let isPlayerTurn = true;
 let selectedFrom: Position | null = null;
 let selectedCellElement: HTMLElement | null = null;
+let lastMove: { from: Position; to: Position } | null = null;
+let showLegalMoves = true;
 
 function preloadAllPieceImages(): void {
   const basePieces = ['rook','rook2', 'knight', 'knight2', 'bishop', 'bishop2', 'queen', 'king'];
@@ -56,9 +59,9 @@ preloadAllPieceImages();
 
 document.addEventListener('click', function unlockAudioOnce() {
   console.log('[AUDIO] Desbloqueando sonido con primer click');
-  // Solo desbloquea el contexto de audio, no reproduce ningún sonido aquí
   document.removeEventListener('click', unlockAudioOnce);
 }, { once: true });
+
 export function showBoard(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
@@ -88,6 +91,116 @@ export function showBoard(): void {
 
   if (config.mode === 'ai' && config.playerColor === 'black') {
     setTimeout(() => triggerAIMove(engine), 500);
+  }
+}
+
+
+export function animateRemoteMove(
+  engine: Engine,
+  from: { row: number; col: number },
+  to: { row: number; col: number },
+  callback?: () => void
+): void {
+  const prevBoard = engine.getBoard().map(row => row.map(p => p ? { ...p } : null));
+  const boardDiv = document.getElementById('chess-board');
+  console.log('[animateRemoteMove] Animando movimiento remoto', from, to);
+  if (!boardDiv) {
+    console.warn('[animateRemoteMove] No se encontró el tablero.');
+    return;
+  }
+
+  const fromIndex = from.row * 8 + from.col;
+  const toIndex = to.row * 8 + to.col;
+  const fromDiv = boardDiv.children[fromIndex] as HTMLElement;
+  const toDiv = boardDiv.children[toIndex] as HTMLElement;
+  const img = fromDiv?.querySelector('img');
+
+  if (img && toDiv) {
+    console.log('[animateRemoteMove] Imagen encontrada para animar:', img.src);
+    const dragSrc = img.dataset.dragSrc || img.dataset.defaultSrc;
+
+    if (dragSrc) {
+      img.src = `/assets/pieces/${dragSrc}`;
+    }
+
+    // Crear imagen flotante
+    const fromRect = img.getBoundingClientRect();
+    const toRect = toDiv.getBoundingClientRect();
+    const floatingImg = img.cloneNode(true) as HTMLImageElement;
+    floatingImg.style.position = 'fixed';
+    floatingImg.style.left = `${fromRect.left}px`;
+    floatingImg.style.top = `${fromRect.top}px`;
+    floatingImg.style.width = `${fromRect.width}px`;
+    floatingImg.style.height = `${fromRect.height}px`;
+    floatingImg.style.pointerEvents = 'none';
+    floatingImg.style.transition = 'left 0.4s linear, top 0.4s linear, opacity 0.1s';
+
+    document.body.appendChild(floatingImg);
+    img.style.visibility = 'hidden';
+
+    // Mover la imagen flotante
+    setTimeout(() => {
+      floatingImg.style.left = `${toRect.left}px`;
+      floatingImg.style.top = `${toRect.top}px`;
+    }, 10);
+
+    setTimeout(() => {
+      floatingImg.style.opacity = '0';
+
+      setTimeout(() => {
+        document.body.removeChild(floatingImg);
+        img.style.visibility = 'visible';
+        img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+
+        // Captura detectada antes de mover
+        const captured = prevBoard[to.row][to.col];
+        const wasCapture = captured !== null;
+
+        engine.makeMove(from, to);
+        lastMove = { from, to }; // <-- Guarda el último movimiento
+
+        if (wasCapture) {
+          audioManager.play('capture');
+        } else {
+          audioManager.play('move');
+        }
+
+        const currentTurn = engine.getCurrentTurn();
+        const config = gameConfigManager.getConfig();
+        timerManager.addIncrement(currentTurn === 'white' ? 'black' : 'white');
+        timerManager.startTurn(currentTurn);
+
+        renderBoard(engine, engine.getBoard());
+
+        if (engine.isInCheck(currentTurn)) {
+          audioManager.play('check');
+        }
+
+        if (callback) callback();
+
+      }, 100);
+    }, 1000);
+  } else {
+    console.warn('[animateRemoteMove] No se pudo encontrar la imagen para animar el movimiento.');
+    // Si no se puede animar, aplicar movimiento directamente
+    const captured = engine.getBoard()[to.row][to.col];
+    const wasCapture = captured !== null;
+    engine.makeMove(from, to);
+    lastMove = { from, to }; // <-- Guarda el último movimiento
+
+    audioManager.play(wasCapture ? 'capture' : 'move');
+
+    const currentTurn = engine.getCurrentTurn();
+    timerManager.addIncrement(currentTurn === 'white' ? 'black' : 'white');
+    timerManager.startTurn(currentTurn);
+
+    renderBoard(engine, engine.getBoard());
+
+    if (engine.isInCheck(currentTurn)) {
+      audioManager.play('check');
+    }
+
+    if (callback) callback();
   }
 }
 
@@ -125,6 +238,11 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
   const blackInCheck = engine.isInCheck('black');
   const config = gameConfigManager.getConfig();
 
+  let legalMoves: Position[] = [];
+  if (showLegalMoves && selectedFrom) {
+    legalMoves = engine.getLegalMoves(selectedFrom);
+  }
+
   for (let row = 0; row < 8; row++) {
     for (let col = 0; col < 8; col++) {
       const square = document.createElement('div');
@@ -139,7 +257,7 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
         const img = document.createElement('img');
         const isKingInCheck = piece.type === 'king' &&
           ((piece.color === 'white' && whiteInCheck) ||
-           (piece.color === 'black' && blackInCheck));
+            (piece.color === 'black' && blackInCheck));
 
         if (isKingInCheck) {
           square.classList.add('in-check');
@@ -156,179 +274,163 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
         img.style.height = '100%';
         img.style.objectFit = 'contain';
         img.draggable = false;
+        img.style.zIndex = '10';
 
         square.appendChild(img);
 
-        // Restaurar drag
-        square.draggable = true;
-        square.addEventListener('dragstart', (e) => {
-          if (config.mode === 'online' && !canMove()) {
-            e.preventDefault();
-            return;
-          }
-          const piece = engine.getBoard()[row][col];
-          if (!isPlayerTurn || !piece || piece.color !== config.playerColor) {
-            e.preventDefault();
-            return;
-          }
-
-          img.src = `/assets/pieces/${img.dataset.dragSrc}`;
-          setTimeout(() => {
-            img.style.visibility = 'hidden';
-          }, 0);
-
-          selectedFrom = { row, col };
-        });
-
-        square.addEventListener('dragend', () => {
-          img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
-          img.style.visibility = 'visible';
-          audioManager.play('drag');
-        });
-
-        square.addEventListener('dragover', (e) => e.preventDefault());
-
-        square.addEventListener('drop', () => {
-          if (config.mode === 'online' && !canMove()) {
-            audioManager.play('error');
-            return;
-          }
-          if (!selectedFrom || !isPlayerTurn) return;
-          const to = { row, col };
-          const targetPiece = engine.getBoard()[to.row][to.col];
-          const isCapture: boolean = targetPiece !== null;
-
-          const moved: boolean = engine.makeMove(selectedFrom, to);
-          if (moved) {
-            isPlayerTurn = false;
-            if (isCapture) audioManager.play('capture');
-            const previousTurn = engine.getCurrentTurn() === 'white' ? 'black' : 'white';
-            timerManager.addIncrement(previousTurn);
-            timerManager.startTurn(engine.getCurrentTurn());
-            if (engine.isInCheck(engine.getCurrentTurn())) audioManager.play('check');
-
-            // Espera 100ms antes de redibujar el tablero para que el sonido se inicie
-            setTimeout(() => {
-              renderBoard(engine, engine.getBoard());
-
-              const current = engine.getCurrentTurn();
-              const playerColor = config.playerColor;
-              const playerLost = engine.isInCheck(current) && current === playerColor;
-              const playerWon = engine.isInCheck(current) && current !== playerColor;
-              const isStalemate = !engine.isInCheck(current);
-
-              let resultMessage = '';
-              if (!engine.hasAnyLegalMove(current)) {
-                if (playerLost) resultMessage = '¡Has perdido! (Jaque mate)';
-                else if (playerWon) resultMessage = '¡Has ganado! (Jaque mate)';
-                else if (isStalemate) resultMessage = 'Tablas (ahogado)';
-                showGameOverModal(resultMessage, () => showBoard(), () => showGameModeSelector());
-                return;
-              }
-
-              if (config.mode === 'online' && selectedFrom) sendMove(selectedFrom, to);
-              if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
-                setTimeout(() => triggerAIMove(engine), 1000);
-              } else {
-                isPlayerTurn = true;
-              }
-            }, 200);
-          }
-          selectedFrom = null;
-        });
+        // Agrega el punto de movimiento legal si aplica
+        if (legalMoves.some(p => p.row === row && p.col === col)) {
+          const dot = document.createElement('div');
+          dot.className = 'legal-move-dot';
+          square.appendChild(dot);
+        }
       }
 
-      // Clic para marcar origen o mover
+      if (
+        showLegalMoves &&
+        selectedFrom &&
+        legalMoves.some(pos => pos.row === row && pos.col === col)
+      ) {
+        const dot = document.createElement('div');
+        dot.className = 'legal-move-dot';
+        square.appendChild(dot);
+      }
+
+      // --- Resalta el último movimiento ---
+      if (
+        lastMove &&
+        (
+          (row === lastMove.from.row && col === lastMove.from.col) ||
+          (row === lastMove.to.row && col === lastMove.to.col)
+        )
+      ) {
+        square.classList.add('last-move-cell');
+      }
+
+      // --- EVENTO CLICK ---
       square.addEventListener('click', () => {
         if (!isPlayerTurn || (config.mode === 'online' && !canMove())) {
-          //audioManager.play('error');
           return;
         }
+
         const clicked = { row, col };
         const clickedPiece = board[row][col];
 
+        // Si se hace clic sobre una pieza del propio color (o no hay selección previa)
         if (!selectedFrom || (clickedPiece && clickedPiece.color === config.playerColor)) {
-          if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
+          if (selectedCellElement) {
+            selectedCellElement.classList.remove('selected-cell');
+          }
+
           if (clickedPiece && clickedPiece.color === config.playerColor) {
             selectedFrom = clicked;
-            selectedCellElement = square;
-            square.classList.add('selected-cell');
-          } else {
-            selectedFrom = null;
-            selectedCellElement = null;
+            selectedCellElement = null; // Se va a buscar de nuevo tras renderizar
+            renderBoard(engine, engine.getBoard());
+
+            // Después de renderizar, vuelve a marcar la celda seleccionada
+            const boardDiv = document.getElementById('chess-board');
+            if (boardDiv) {
+              const index = clicked.row * 8 + clicked.col;
+              const cell = boardDiv.children[index] as HTMLElement;
+              if (cell) {
+                cell.classList.add('selected-cell');
+                selectedCellElement = cell;
+              }
+            }
+            return;
           }
-          return;
         }
 
-        const moveFrom = selectedFrom;
-        const isCapture = board[clicked.row][clicked.col] !== null;
-        const moved = engine.makeMove(moveFrom, clicked);
+        if (selectedFrom) {
+          const moveFrom = selectedFrom;
+          const isCapture = board[clicked.row][clicked.col] !== null;
+          const moved = engine.makeMove(moveFrom, clicked);
 
-        if (moved) {
-  selectedFrom = null;
-  if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
-  selectedCellElement = null;
-  isPlayerTurn = false;
-  timerManager.addIncrement(config.playerColor);
-  timerManager.startTurn(engine.getCurrentTurn());
-  if (engine.isInCheck(engine.getCurrentTurn())) audioManager.play('check');
+          if (moved) {
+            selectedFrom = null;
+            if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
+            selectedCellElement = null;
+            isPlayerTurn = false;
+            timerManager.addIncrement(config.playerColor);
+            timerManager.startTurn(engine.getCurrentTurn());
 
-  // --- Animación visual del movimiento del usuario ---
-  const boardDiv = document.getElementById('chess-board');
-  if (boardDiv) {
-    const fromIndex = moveFrom.row * 8 + moveFrom.col;
-    const toIndex = clicked.row * 8 + clicked.col;
-    const fromDiv = boardDiv.children[fromIndex] as HTMLElement;
-    const toDiv = boardDiv.children[toIndex] as HTMLElement;
-    const img = fromDiv?.querySelector('img');
+            // --- Animación visual del movimiento del usuario ---
+            const boardDiv = document.getElementById('chess-board');
+            if (boardDiv) {
+              const fromIndex = moveFrom.row * 8 + moveFrom.col;
+              const toIndex = clicked.row * 8 + clicked.col;
+              const fromDiv = boardDiv.children[fromIndex] as HTMLElement;
+              const toDiv = boardDiv.children[toIndex] as HTMLElement;
+              const img = fromDiv?.querySelector('img');
 
-    if (img && toDiv) {
-      // Cambia a imagen drag y reproduce sonido drag
-      if (img.dataset.dragSrc) {
-        img.src = `/assets/pieces/${img.dataset.dragSrc}`;
-      }
-      //audioManager.play('drag');
+              if (img && toDiv) {
+                // Cambia a imagen drag y reproduce sonido drag
+                if (img.dataset.dragSrc) {
+                  img.src = `/assets/pieces/${img.dataset.dragSrc}`;
+                }
+                //audioManager.play('drag');
 
-      setTimeout(() => {
-        const fromRect = img.getBoundingClientRect();
-        const toRect = toDiv.getBoundingClientRect();
+                setTimeout(() => {
+                  const fromRect = img.getBoundingClientRect();
+                  const toRect = toDiv.getBoundingClientRect();
 
-        const floatingImg = img.cloneNode(true) as HTMLImageElement;
-        floatingImg.style.position = 'fixed';
-        floatingImg.style.left = `${fromRect.left}px`;
-        floatingImg.style.top = `${fromRect.top}px`;
-        floatingImg.style.width = `${fromRect.width}px`;
-        floatingImg.style.height = `${fromRect.height}px`;
-        floatingImg.style.pointerEvents = 'none';
-        floatingImg.style.transition = 'left 0.4s linear, top 0.4s linear, opacity 0.1s';
+                  const floatingImg = img.cloneNode(true) as HTMLImageElement;
+                  floatingImg.style.position = 'fixed';
+                  floatingImg.style.left = `${fromRect.left}px`;
+                  floatingImg.style.top = `${fromRect.top}px`;
+                  floatingImg.style.width = `${fromRect.width}px`;
+                  floatingImg.style.height = `${fromRect.height}px`;
+                  floatingImg.style.pointerEvents = 'none';
+                  floatingImg.style.transition = 'left 0.4s linear, top 0.4s linear, opacity 0.1s';
 
-        document.body.appendChild(floatingImg);
-        img.style.visibility = 'hidden';
+                  document.body.appendChild(floatingImg);
+                  img.style.visibility = 'hidden';
 
-        setTimeout(() => {
-          floatingImg.style.left = `${toRect.left}px`;
-          floatingImg.style.top = `${toRect.top}px`;
-        }, 10);
+                  setTimeout(() => {
+                    floatingImg.style.left = `${toRect.left}px`;
+                    floatingImg.style.top = `${toRect.top}px`;
+                  }, 10);
 
-        setTimeout(() => {
-          floatingImg.style.opacity = '0';
-          setTimeout(() => {
-            document.body.removeChild(floatingImg);
-            if (img.dataset.defaultSrc) {
-              img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+                  setTimeout(() => {
+                    floatingImg.style.opacity = '0';
+                    setTimeout(() => {
+                      document.body.removeChild(floatingImg);
+                      if (img.dataset.defaultSrc) {
+                        img.src = `/assets/pieces/${img.dataset.defaultSrc}`;
+                      }
+                      img.style.visibility = 'visible';
+
+                      // Ejecuta el movimiento real (ya lo hiciste antes, así que solo sonido)
+                      if (isCapture) {
+                        audioManager.play('capture');
+                      } else {
+                        audioManager.play('move');
+                      }
+                      lastMove = { from: moveFrom, to: clicked }; // Guarda el último movimiento
+                      renderBoard(engine, engine.getBoard());
+                      const current = engine.getCurrentTurn();
+                      if (engine.isInCheck(current)) audioManager.play('check');
+
+                      if (config.mode === 'online') sendMove(moveFrom, clicked);
+                      if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
+                        setTimeout(() => triggerAIMove(engine), 1000);
+                      } else {
+                        isPlayerTurn = true;
+                      }
+                    }, 100);
+                  }, 510);
+                }, 200);
+                return; // Salir para no ejecutar el movimiento dos veces
+              }
             }
-            img.style.visibility = 'visible';
 
-            // Ejecuta el movimiento real (ya lo hiciste antes, así que solo sonido)
+            // Si no hay animación, ejecuta el movimiento real como antes
             if (isCapture) {
               audioManager.play('capture');
             } else {
               audioManager.play('move');
             }
-
-            const current = engine.getCurrentTurn();
-            if (engine.isInCheck(current)) audioManager.play('check');
-
+            lastMove = { from: moveFrom, to: clicked }; // Guarda el último movimiento
             renderBoard(engine, engine.getBoard());
             if (config.mode === 'online') sendMove(moveFrom, clicked);
             if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
@@ -336,45 +438,21 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
             } else {
               isPlayerTurn = true;
             }
-          }, 100);
-        }, 510);
-      }, 200);
-      return; // Salir para no ejecutar el movimiento dos veces
-    }
-  } else {
-
-    // Si no hay animación, ejecuta el movimiento real como antes
-    if (isCapture) {
-      audioManager.play('capture');
-    } else {
-      audioManager.play('move');
-    }
-    renderBoard(engine, engine.getBoard());
-    if (config.mode === 'online') sendMove(moveFrom, clicked);
-    if (config.mode === 'ai' && engine.getCurrentTurn() !== config.playerColor) {
-      setTimeout(() => triggerAIMove(engine), 1000);
-    } else {
-      isPlayerTurn = true;
-    }
-  } 
-}
-          
-          else {
-          audioManager.play('error');
-          selectedFrom = null;
-          if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
-          selectedCellElement = null;
+          } else {
+            audioManager.play('error');
+            selectedFrom = null;
+            if (selectedCellElement) selectedCellElement.classList.remove('selected-cell');
+            selectedCellElement = null;
+            renderBoard(engine, engine.getBoard());
+          }
         }
       });
 
       boardDiv.appendChild(square);
     }
   }
-}
-
-
+} // <-- CIERRE 
 // --- Mueve la IA ---
-// Esta función se encarga de que la IA haga su movimiento, ya sea en un juego local o en línea.
 function triggerAIMove(engine: Engine): void {
   const config = gameConfigManager.getConfig();
 
@@ -435,7 +513,6 @@ function triggerAIMove(engine: Engine): void {
       if (img.dataset.dragSrc) {
         img.src = `/assets/pieces/${img.dataset.dragSrc}`;
       }
-      
 
       // Espera un poco y luego anima el movimiento
       setTimeout(() => {
@@ -481,7 +558,7 @@ function triggerAIMove(engine: Engine): void {
 
             // Ejecuta el movimiento real
             engine.makeMove(move.from, move.to);
-
+            lastMove = { from: move.from, to: move.to }; // Guarda el último movimiento 
             // Sonido correcto
             if (wasCapture) {
               audioManager.play('capture');
@@ -494,12 +571,12 @@ function triggerAIMove(engine: Engine): void {
 
             timerManager.addIncrement(iaColor);
             timerManager.startTurn(currentTurn);
+            renderBoard(engine, engine.getBoard());
 
             if (engine.isInCheck(currentTurn)) {
               audioManager.play('check');
             }
 
-            renderBoard(engine, engine.getBoard());
             isPlayerTurn = true;
 
           }, 100);
@@ -511,6 +588,7 @@ function triggerAIMove(engine: Engine): void {
 
   // Si no hay animación, ejecuta el movimiento real como antes
   engine.makeMove(move.from, move.to);
+  lastMove = { from: move.from, to: move.to }; // Guarda el último movimiento
 
   const newBoard = engine.getBoard();
   const capturedPiece = prevBoard[move.to.row][move.to.col];
@@ -528,11 +606,11 @@ function triggerAIMove(engine: Engine): void {
   timerManager.addIncrement(iaColor);
   timerManager.startTurn(currentTurn);
 
+  renderBoard(engine, engine.getBoard());
   if (engine.isInCheck(currentTurn)) {
     audioManager.play('check');
   }
 
-  renderBoard(engine, engine.getBoard());
   console.log('AI move executed:', move);
   isPlayerTurn = true;
 }

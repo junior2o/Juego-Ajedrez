@@ -1,10 +1,8 @@
-// src/logic/remoteGame.ts
-
 import { Engine } from './engine';
 import { MatchManager } from '../config/MatchManager';
 import { GameMessage, MoveMessage, StartGameMessage } from '../network/messages';
 import { WebSocketManager } from '../network/WebSocketManager';
-import { renderBoard } from '../ui/Board';
+import { renderBoard, animateRemoteMove } from '../ui/Board';
 import { showGameOverModal } from '../ui/GameOverModal';
 import { showGameModeSelector} from '../ui/GameModeSelector';
 import { gameConfigManager } from '../config/GameConfigManager';
@@ -60,7 +58,7 @@ export function startRemoteGame(startData: StartGameMessage): void {
   timerManager.reset();
   if (isMyTurn) {
     timerManager.startTurn(myColor);
-}
+  }
 
   renderTimers(boardHolder, timerManager);
 
@@ -69,17 +67,13 @@ export function startRemoteGame(startData: StartGameMessage): void {
 }
 
 export function handleRemoteMove(message: MoveMessage): void {
+  console.log('[RemoteGame] handleRemoteMove', message);
   const config = gameConfigManager.getConfig();
   if (message.playerId === MatchManager.getInstance().getLocalId()) return;
 
-  const success = engine.makeMove(message.from, message.to);
-  if (success) {
-    renderBoard(engine, engine.getBoard());
-    // El turno ahora es del jugador local
-    timerManager.addIncrement(config.playerColor);
-    timerManager.startTurn(config.playerColor);
-    isMyTurn = true;
-  }
+  animateRemoteMove(engine, message.from, message.to, () => {
+   isMyTurn = true; // <-- Habilita tu turno después de la animación
+  });
 }
 
 export function sendMove(from: { row: number; col: number }, to: { row: number; col: number }): void {
