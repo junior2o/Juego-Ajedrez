@@ -1,0 +1,87 @@
+/* File: src/styles/menu.css */
+
+body {
+  min-height: 100vh;
+  min-width: 100vw;
+  height: 100vh;
+  width: 100vw;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: url('/assets/img/bg-menu.png') no-repeat center center fixed;
+  background-size: cover;
+}
+
+/* Cambia el fondo si el dispositivo está en horizontal */
+@media (orientation: landscape) {
+  body {
+    background-image: url('/assets/img/tab-menu.png');
+    background-size: 100vw 100vh;   /* ESTIRA la imagen al 100% del viewport */
+    background-repeat: no-repeat;
+    background-position: center center;
+    background-color: #000;
+  }
+}
+/* Pantalla del menú */
+#menu-screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 2rem;
+  color: white;
+  font-family: 'Segoe UI', sans-serif;
+  text-align: center;
+}
+
+/* Header con ID y engranaje */
+.menu-header {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+  right: 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 1rem;
+}
+
+.player-id {
+  font-size: 1rem;
+  background: rgba(0, 0, 0, 0.4);
+  padding: 0.5rem 1rem;
+  border-radius: 10px;
+}
+
+.gear-icon {
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* Botones principales */
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.menu-btn {
+  padding: 1rem;
+  font-size: 1.1rem;
+  background: rgba(255, 255, 255, 0.8);
+  color: #000;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.menu-btn:hover {
+  background: white;
+}
+
+.hidden {
+  display: none;
+}
+

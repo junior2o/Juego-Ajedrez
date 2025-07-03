@@ -242,7 +242,8 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
   if (showLegalMoves && selectedFrom) {
     legalMoves = engine.getLegalMoves(selectedFrom);
   }
-
+  
+  const letters = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'];
   for (let row = 0; row < 8; row++) {
     for (let col = 0; col < 8; col++) {
       const square = document.createElement('div');
@@ -251,6 +252,21 @@ export function renderBoard(engine: Engine, board: Square[][]): void {
       square.style.width = '100%';
       square.style.height = '100%';
       square.style.position = 'relative';
+
+      if (row === 7) {
+        const fileLabel = document.createElement('span');
+        fileLabel.textContent = letters[col];
+        fileLabel.className = 'cell-label file-label';
+        square.appendChild(fileLabel);
+      }
+
+      if (col === 0) {
+        const rankLabel = document.createElement('span');
+        rankLabel.textContent = `${8 - row}`;
+        rankLabel.className = 'cell-label rank-label';
+        square.appendChild(rankLabel);
+      }
+
 
       const piece = board[row][col];
       if (piece) {

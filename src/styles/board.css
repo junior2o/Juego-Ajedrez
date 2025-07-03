@@ -54,3 +54,44 @@
   box-sizing: border-box !important;
   backdrop-filter: blur(1px); /* (opcional) Suaviza el punto con un efecto sutil */
 }
+
+.cell-label {
+  position: absolute;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5); /* gris muy claro y transparente */
+  font-family: sans-serif;
+  user-select: none;
+  pointer-events: none;
+  z-index: 15;
+}
+
+.file-label {
+  bottom: 3px;
+  right: 4px;
+}
+
+.rank-label {
+  top: 3px;
+  left: 4px;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+#app {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+}
+
+#board-holder {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+}

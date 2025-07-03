@@ -1,5 +1,3 @@
-// src/ui/GameModeSelector.ts
-
 import { showAILevelSelector } from './AILevelSelector';
 import { showIDConnectScreen } from './IDConnectScreen';
 import { resetRemoteGame } from '../logic/remoteGame';
@@ -12,53 +10,92 @@ export function showGameModeSelector(): void {
   const container = document.getElementById('app')!;
   container.innerHTML = '';
 
-  const wrapper = document.createElement('div');
-  wrapper.style.display = 'flex';
-  wrapper.style.flexDirection = 'column';
-  wrapper.style.alignItems = 'center';
-  wrapper.style.gap = '20px';
-  wrapper.style.padding = '40px';
+  // Pantalla del menú principal
+  const menuScreen = document.createElement('div');
+  menuScreen.id = 'menu-screen';
 
-  // Mostrar el ID del jugador
+  // Indicador de ID centrado con imagen y botón de copia personalizado
   const playerId = MatchManager.getInstance().getLocalId() || '(esperando ID...)';
-  const idLabel = document.createElement('div');
-  idLabel.style.fontSize = '1.1rem';
-  idLabel.style.marginBottom = '10px';
-  idLabel.style.background = '#f5f5f5';
-  idLabel.style.padding = '8px 16px';
-  idLabel.style.borderRadius = '8px';
-  idLabel.style.userSelect = 'all';
-  idLabel.textContent = `Tu ID: ${playerId}`;
-  wrapper.appendChild(idLabel);
 
-  const title = document.createElement('h2');
-  title.textContent = 'Choose Game Mode';
-  wrapper.appendChild(title);
+  const idWrapper = document.createElement('div');
+  idWrapper.style.position = 'absolute';
+  idWrapper.style.top = '50%';
+  idWrapper.style.left = '50%';
+  idWrapper.style.transform = 'translate(-50%, -60%)';
+  idWrapper.style.opacity = '0';
+  idWrapper.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
+  idWrapper.style.display = 'flex';
+  idWrapper.style.justifyContent = 'center';
+  idWrapper.style.alignItems = 'center';
+  idWrapper.style.gap = '0.75rem';
+  idWrapper.style.background = 'rgba(0, 0, 0, 0.5)';
+  idWrapper.style.padding = '1rem 2rem';
+  idWrapper.style.borderRadius = '12px';
+
+  const userIcon = document.createElement('img');
+  userIcon.src = '/assets/img/userID.png';
+  userIcon.alt = 'user icon';
+  userIcon.style.width = '60px';
+  userIcon.style.height = '60px';
+
+  const idLabel = document.createElement('div');
+  idLabel.className = 'player-id';
+  idLabel.innerHTML = `<strong>${playerId}</strong>`;
+  idLabel.style.fontSize = '1.6rem';
+  idLabel.style.color = 'white';
+  idLabel.style.whiteSpace = 'nowrap';
+  idLabel.style.display = 'flex';
+  idLabel.style.alignItems = 'center';
+  idLabel.style.gap = '0.5rem';
+
+  const copyBtn = document.createElement('img');
+  copyBtn.src = '/assets/img/copy.png';
+  copyBtn.alt = 'Copiar ID';
+  copyBtn.style.width = '60px';
+  copyBtn.style.height = '60px';
+  copyBtn.style.cursor = 'pointer';
+  copyBtn.title = 'Copiar ID';
+  copyBtn.addEventListener('click', () => {
+    navigator.clipboard.writeText(playerId).then(() => {
+      copyBtn.src = '/assets/img/check.png';
+      setTimeout(() => copyBtn.src = '/assets/img/copy.png', 1500);
+    });
+  });
+
+  idWrapper.appendChild(userIcon);
+  idWrapper.appendChild(idLabel);
+  idWrapper.appendChild(copyBtn);
+  menuScreen.appendChild(idWrapper);
+
+  setTimeout(() => {
+    idWrapper.style.opacity = '1';
+    idWrapper.style.transform = 'translate(-50%, -50%)';
+  }, 50);
+
+  // Contenedor de botones abajo del todo
+  const buttonsContainer = document.createElement('div');
+  buttonsContainer.className = 'menu-buttons';
+  buttonsContainer.style.flexDirection = 'row';
+  buttonsContainer.style.justifyContent = 'center';
 
   const modes: { label: string; value: GameMode }[] = [
-    { label: 'Play vs AI', value: 'ai' },
-    { label: 'Play with Friend (ID)', value: 'id' },
-    { label: 'Random Opponent', value: 'random' },
+    { label: 'Jugar contra la IA', value: 'ai' },
+    { label: 'Jugar con un amigo', value: 'id' },
+    { label: 'Jugar en línea', value: 'random' },
   ];
 
   for (const { label, value } of modes) {
     const btn = document.createElement('button');
+    btn.className = 'menu-btn';
     btn.textContent = label;
-    btn.style.padding = '12px 24px';
-    btn.style.fontSize = '1.1rem';
-    btn.style.cursor = 'pointer';
-    btn.style.width = '260px';
-
     btn.addEventListener('click', () => {
-      resetRemoteGame(); // Reinicia el juego remoto antes de cambiar de modo
-
+      resetRemoteGame();
       if (value === 'ai') {
         showAILevelSelector();
       } else if (value === 'id') {
-        showIDConnectScreen(); // pantalla para conexión por ID
+        showIDConnectScreen();
       } else if (value === 'random') {
         const playerId = MatchManager.getInstance().getLocalId();
-
         if (!playerId || playerId === 'esperando') {
           alert('Esperando asignación de ID por el servidor. Intenta de nuevo en unos segundos.');
           return;
@@ -70,9 +107,9 @@ export function showGameModeSelector(): void {
         alert('Buscando oponente aleatorio...');
       }
     });
-
-    wrapper.appendChild(btn);
+    buttonsContainer.appendChild(btn);
   }
 
-  container.appendChild(wrapper);
+  menuScreen.appendChild(buttonsContainer);
+  container.appendChild(menuScreen);
 }
