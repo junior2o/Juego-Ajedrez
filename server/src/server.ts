@@ -84,11 +84,27 @@ wss.on('connection', (socket) => {
             console.log(`[Server] Reenviando join_request de ${msg.fromId} a ${msg.toId}`);
             sendToPlayer(msg.toId, msg);
           } else {
-            sendToPlayer(msg.fromId, {
-              type: 'join_response',
-              accepted: false,
-              fromId: msg.toId,
-            });
+            const target = players.get(msg.toId);
+
+            if (!target) {
+              sendToPlayer(msg.fromId, {
+                type: 'join_response',
+                accepted: false,
+                fromId: msg.toId,
+                reason: 'not_found', // Nuevo: ID no encontrado o desconectado
+              });
+            } else if (target.inGame) {
+              sendToPlayer(msg.fromId, {
+                type: 'join_response',
+                accepted: false,
+                fromId: msg.toId,
+                reason: 'in_game', // Nuevo: ya está en partida
+              });
+            } else {
+              console.log(`[Server] Reenviando join_request de ${msg.fromId} a ${msg.toId}`);
+              sendToPlayer(msg.toId, msg);
+            }
+
           }
           break;
         }

@@ -1,11 +1,7 @@
 // src/ui/WaitingForOpponentScreen.ts
 
 import { WebSocketManager } from '../network/WebSocketManager';
-import { JoinResponseMessage } from '../network/messages';
-import { MatchManager } from '../config/MatchManager';
 import { showGameModeSelector } from './GameModeSelector';
-
-let joinResponseHandler: ((msg: any) => void) | null = null;
 
 export function showWaitingForOpponentScreen(): void {
   const container = document.getElementById('app')!;
@@ -21,50 +17,23 @@ export function showWaitingForOpponentScreen(): void {
 
   const message = document.createElement('p');
   message.textContent = 'Esperando a que el oponente acepte la invitación...';
+  message.style.fontSize = '1.2rem';
+  message.style.color = 'white';
   wrapper.appendChild(message);
 
   const cancelButton = document.createElement('button');
   cancelButton.textContent = 'Cancelar';
-  cancelButton.style.padding = '10px 20px';
-  cancelButton.style.fontSize = '16px';
-  cancelButton.style.cursor = 'pointer';
+  cancelButton.className = 'menu-btn';
+  cancelButton.style.width = '260px';
   cancelButton.onclick = () => {
     WebSocketManager.getInstance().send({
       type: 'error',
       message: 'Invitación cancelada por el remitente.',
     });
 
-    if (joinResponseHandler) {
-      WebSocketManager.getInstance().off('join_response', joinResponseHandler);
-      joinResponseHandler = null;
-    }
     showGameModeSelector();
   };
   wrapper.appendChild(cancelButton);
+
   container.appendChild(wrapper);
-
-  // Limpia el listener anterior si existe
-  if (joinResponseHandler) {
-    WebSocketManager.getInstance().off('join_response', joinResponseHandler);
-  }
-
-  joinResponseHandler = (msg) => {
-    const response = msg as JoinResponseMessage;
-
-    if (response.accepted) {
-      const matchId = `${response.fromId}-${MatchManager.getInstance().getLocalId()}`;
-      MatchManager.getInstance().setMatchId(matchId);
-
-      console.log('[WaitingScreen] Invitación aceptada. Esperando inicio de partida desde el servidor.');
-      
-    } else {
-      alert('El oponente ha rechazado la invitación.');
-      showGameModeSelector();
-    }
-
-    WebSocketManager.getInstance().off('join_response', joinResponseHandler!);
-    joinResponseHandler = null;
-  };
-
-  WebSocketManager.getInstance().on('join_response', joinResponseHandler);
 }

@@ -1,6 +1,8 @@
 import { gameConfigManager } from '../config/GameConfigManager';
 import { AIDifficulty } from '../types/AIDifficulty';
 import { showBoard } from './Board';
+import { createGameModeButtons } from './shared/MenuButtons';
+import { createCenteredScreen } from './shared/CenteredScreen';
 
 export function showAILevelSelector(): void {
   const container = document.getElementById('app')!;
@@ -12,51 +14,44 @@ export function showAILevelSelector(): void {
   wrapper.style.alignItems = 'center';
   wrapper.style.justifyContent = 'center';
   wrapper.style.gap = '20px';
-  wrapper.style.padding = '40px';
 
   const title = document.createElement('h2');
-  title.textContent = 'Select AI Difficulty';
+  title.textContent = 'Selecciona la dificultad de la IA';
   wrapper.appendChild(title);
 
   const levels: { label: string; value: AIDifficulty }[] = [
-    { label: '🟢 Easy', value: 'easy' },
-    { label: '🟡 Medium', value: 'medium' },
-    { label: '🔴 Hard', value: 'hard' },
+    { label: '🟢 Fácil', value: 'easy' },
+    { label: '🟡 Media', value: 'medium' },
+    { label: '🔴 Difícil', value: 'hard' },
   ];
 
   let selectedDifficulty: AIDifficulty = 'easy';
 
   for (const { label, value } of levels) {
     const btn = document.createElement('button');
+    btn.className = 'menu-btn';
     btn.textContent = label;
-    btn.style.padding = '12px 24px';
-    btn.style.fontSize = '1.1rem';
-    btn.style.cursor = 'pointer';
-    btn.style.width = '220px';
-
+    btn.style.width = '260px';
     btn.addEventListener('click', () => {
       selectedDifficulty = value;
       showWhoStarts();
     });
-
     wrapper.appendChild(btn);
   }
 
-  container.appendChild(wrapper);
-
   function showWhoStarts(): void {
-    wrapper.innerHTML = ''; // Limpia sólo este contenedor
+    wrapper.innerHTML = '';
 
     const startTitle = document.createElement('h2');
-    startTitle.textContent = 'Who Starts?';
+    startTitle.textContent = '¿Quién empieza?';
     wrapper.appendChild(startTitle);
 
     const playerBtn = document.createElement('button');
-    playerBtn.textContent = 'You Start';
+    playerBtn.textContent = 'Empiezas tú';
     styleButton(playerBtn);
 
     const aiBtn = document.createElement('button');
-    aiBtn.textContent = 'AI Starts';
+    aiBtn.textContent = 'Empieza la IA';
     styleButton(aiBtn);
 
     playerBtn.addEventListener('click', () => {
@@ -64,7 +59,7 @@ export function showAILevelSelector(): void {
       gameConfigManager.setConfig({
         mode: 'ai',
         playerColor: 'white',
-        aiLevel: selectedDifficulty
+        aiLevel: selectedDifficulty,
       });
       showBoard();
     });
@@ -74,7 +69,7 @@ export function showAILevelSelector(): void {
       gameConfigManager.setConfig({
         mode: 'ai',
         playerColor: 'black',
-        aiLevel: selectedDifficulty
+        aiLevel: selectedDifficulty,
       });
       showBoard();
     });
@@ -84,14 +79,15 @@ export function showAILevelSelector(): void {
   }
 
   function styleButton(btn: HTMLButtonElement) {
-    btn.style.padding = '12px 24px';
-    btn.style.fontSize = '1.1rem';
-    btn.style.cursor = 'pointer';
-    btn.style.width = '220px';
+    btn.className = 'menu-btn';
+    btn.style.width = '260px';
   }
 
   function disableButtons() {
     const buttons = wrapper.querySelectorAll('button');
     buttons.forEach(btn => (btn.disabled = true));
   }
+
+  const screen = createCenteredScreen(wrapper, createGameModeButtons(['ai']));
+  container.appendChild(screen);
 }

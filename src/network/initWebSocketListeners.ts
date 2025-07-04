@@ -1,5 +1,3 @@
-// ../network/initWebSocketListeners.ts
-
 import { WebSocketManager } from './WebSocketManager';
 import {
   JoinRequestMessage,
@@ -13,6 +11,7 @@ import { showIncomingInviteScreen } from '../ui/IncomingInviteScreen';
 import { startRemoteGame, handleRemoteMove } from '../logic/remoteGame';
 import { showGameModeSelector } from '../ui/GameModeSelector';
 import { MatchManager } from '../config/MatchManager';
+import { showModal } from '../ui/shared/Modal';
 
 console.log('[Client] initWebSocketListeners ejecutado');
 
@@ -37,39 +36,68 @@ export function initWebSocketListeners(): void {
 
   wsManager.on('join_response', (msg) => {
     const response = msg as JoinResponseMessage;
+
     if (!response.accepted) {
-      alert('El jugador rechazó la invitación o ya está en partida.');
-      showGameModeSelector();
+      let text = 'No se pudo conectar con el jugador.';
+      let title = '⛔ Error';
+      let icon = '/assets/img/warning.png';
+
+      switch (response.reason) {
+        case 'not_found':
+          text = 'El ID introducido no existe o el jugador no está conectado.';
+          title = '❌ ID no encontrado';
+          icon = '/assets/img/warning.png';
+          break;
+        case 'in_game':
+          text = 'El jugador ya está en una partida.';
+          title = '🎮 Jugador ocupado';
+          icon = '/assets/img/busy.png';
+          break;
+        case 'rejected':
+          text = 'El jugador ha rechazado tu invitación.';
+          title = '🙅 Invitación rechazada';
+          icon = '/assets/img/rejected.png';
+          break;
+      }
+
+      showModal(text, title, {
+        confirmText: 'Aceptar',
+        iconSrc: icon,
+        onConfirm: () => {
+          showGameModeSelector();
+        }
+      });
     }
   });
 
- wsManager.on('opponent_disconnected', (msg) => {
-  if ('playerId' in msg) {
-    const discMsg = msg as OpponentDisconnectedMessage;
-    alert('Tu oponente se ha desconectado.');
-    showGameModeSelector();
-  }
-});
+  wsManager.on('opponent_disconnected', (msg) => {
+    if ('playerId' in msg) {
+      const discMsg = msg as OpponentDisconnectedMessage;
+      showModal(
+        'Tu oponente se ha desconectado.',
+        '🔌 Desconexión',
+        {
+          confirmText: 'Aceptar',
+          iconSrc: '/assets/img/warning.png',
+          onConfirm: () => showGameModeSelector()
+        }
+      );
+    }
+  });
 
-
-  // Listener para recibir el ID final desde el servidor
   wsManager.on('init', (msg) => {
-  const initMsg = msg as InitMessage;
+    const initMsg = msg as InitMessage;
 
-  if (initMsg.id !== 'esperando') {
-    localStorage.setItem('playerId', initMsg.id);
-    MatchManager.getInstance().setLocalId(initMsg.id);
-    console.log('[Client] Received ID from server and stored:', initMsg.id);
+    if (initMsg.id !== 'esperando') {
+      localStorage.setItem('playerId', initMsg.id);
+      MatchManager.getInstance().setLocalId(initMsg.id);
+      console.log('[Client] Received ID from server and stored:', initMsg.id);
+      showGameModeSelector();
+    } else {
+      console.warn('[Client] ID "esperando" no se guarda en localStorage');
+    }
+  });
 
-    // Mostrar el menú principal solo cuando ya tenemos el ID
-    showGameModeSelector();
-  } else {
-    console.warn('[Client] ID "esperando" no se guarda en localStorage');
-  }
-});
-
-
-  // Listener para movimientos remotos
   wsManager.on('move', (msg) => {
     handleRemoteMove(msg as MoveMessage);
   });

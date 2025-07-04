@@ -75,6 +75,7 @@ body {
   border-radius: 12px;
   cursor: pointer;
   font-weight: bold;
+  width: 260px;
 }
 
 .menu-btn:hover {

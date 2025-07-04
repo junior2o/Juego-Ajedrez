@@ -36,6 +36,7 @@ export interface JoinResponseMessage extends MessageBase {
   accepted: boolean;
   fromId: string;
   toId: string;
+  reason?: 'not_found' | 'in_game' | 'rejected';
 }
 
 export interface StartGameMessage extends MessageBase {
